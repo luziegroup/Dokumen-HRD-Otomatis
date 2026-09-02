@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dokumen HRD Otomatis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F6F5F0; --ink:#1F2A24; --ink-soft:#54615A;
+    --primary:#2F6F5E; --primary-dark:#234F42; --primary-tint:#E4EEE9;
+    --accent:#B8843C; --accent-tint:#F5EBDA;
+    --line:#DAD5C9; --surface:#FFFFFF; --danger:#A6432F; --danger-tint:#F5E4DF;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  .app{display:flex;min-height:100vh;}
+  .sidebar{width:230px;flex-shrink:0;background:var(--ink);color:#EFEEE7;display:flex;flex-direction:column;padding:24px 0;}
+  .brand{padding:0 22px 22px;border-bottom:1px solid rgba(255,255,255,0.12);margin-bottom:14px;}
+  .brand-mark{font-family:'Source Serif 4',serif;font-size:20px;font-weight:600;line-height:1.2;}
+  .brand-sub{font-size:12px;color:#B7C4BD;margin-top:4px;}
+  .nav{display:flex;flex-direction:column;gap:2px;padding:0 12px;}
+  .nav button{display:flex;align-items:center;gap:10px;background:none;border:none;color:#D9E0DB;padding:11px 12px;border-radius:8px;font-size:14px;text-align:left;transition:background .15s;}
+  .nav button:hover{background:rgba(255,255,255,0.08);}
+  .nav button.active{background:var(--primary);color:#fff;font-weight:600;}
+  .nav-spacer{flex:1;}
+  .sidebar-foot{padding:14px 22px 0;font-size:11px;color:#8A968F;border-top:1px solid rgba(255,255,255,0.1);margin-top:14px;}
+  .main{flex:1;padding:36px 44px;max-width:1140px;}
+  .page-head{margin-bottom:28px;}
+  .page-head h1{font-family:'Source Serif 4',serif;font-size:28px;margin:0 0 6px;font-weight:600;}
+  .page-head p{margin:0;color:var(--ink-soft);font-size:14.5px;max-width:660px;line-height:1.5;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px;}
+  .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;}
+  .stat-num{font-family:'Source Serif 4',serif;font-size:32px;font-weight:600;color:var(--primary-dark);}
+  .stat-label{font-size:13px;color:var(--ink-soft);margin-top:2px;}
+  .section-title{font-size:15px;font-weight:600;margin:0 0 12px;}
+  .quick-actions{display:flex;gap:12px;flex-wrap:wrap;}
+  .quick-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px;}
+  .quick-card h3{margin:0;font-size:14.5px;}
+  .quick-card p{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.4;}
+  .quick-card button{align-self:flex-start;}
+  .btn{border:1px solid var(--primary);background:var(--primary);color:#fff;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;transition:background .15s,transform .1s;}
+  .btn:hover{background:var(--primary-dark);}
+  .btn:active{transform:scale(.98);}
+  .btn-outline{background:transparent;color:var(--primary-dark);border:1px solid var(--line);}
+  .btn-outline:hover{background:var(--primary-tint);border-color:var(--primary);}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+  .btn-danger:hover{background:var(--danger-tint);}
+  .btn-sm{padding:6px 11px;font-size:12.5px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;padding:12px 16px;background:#FAFAF7;border-bottom:1px solid var(--line);color:var(--ink-soft);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.02em;}
+  td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#FBFBF8;}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .empty-state{padding:48px 24px;text-align:center;color:var(--ink-soft);}
+  .empty-state h3{font-family:'Source Serif 4',serif;font-size:18px;color:var(--ink);margin:0 0 6px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+  .search-input{padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;min-width:220px;background:var(--surface);}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
+  .badge-tetap{background:var(--primary-tint);color:var(--primary-dark);}
+  .badge-kontrak{background:var(--accent-tint);color:#8A5F26;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,26,22,0.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
+  .modal{background:var(--surface);border-radius:12px;max-width:640px;width:100%;padding:28px 30px;box-shadow:0 20px 50px rgba(0,0,0,0.2);}
+  .modal h2{font-family:'Source Serif 4',serif;font-size:20px;margin:0 0 18px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-field{display:flex;flex-direction:column;gap:5px;}
+  .form-field.full{grid-column:1/-1;}
+  .form-field label{font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+  .form-field input,.form-field select,.form-field textarea{padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:13.5px;}
+  .form-field input:focus,.form-field select:focus,.form-field textarea:focus{outline:2px solid var(--primary);outline-offset:1px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
+  .subsection{border-top:1px solid var(--line);margin-top:18px;padding-top:16px;}
+  .subsection-title{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+  .salary-row{display:grid;grid-template-columns:1.6fr 1fr 0.8fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px;}
+  .salary-row input,.salary-row select{padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;}
+  .icon-btn{background:none;border:none;color:var(--danger);font-size:16px;padding:4px 8px;border-radius:6px;}
+  .icon-btn:hover{background:var(--danger-tint);}
+  .gen-layout{display:grid;grid-template-columns:360px 1fr;gap:24px;align-items:start;}
+  .gen-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:16px;position:sticky;top:24px;max-height:calc(100vh - 48px);overflow-y:auto;}
+  .doc-preview-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:0;overflow:hidden;}
+  .doc-preview-head{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#FAFAF7;flex-wrap:wrap;gap:10px;}
+  .doc-preview-head span{font-size:13px;color:var(--ink-soft);}
+  .doc-paper{padding:0;}
+  .doc-letterhead{padding:24px 36px 0;text-align:center;}
+  .doc-letterhead img{display:block;width:100%;height:auto;margin:0 auto;}
+  .doc-body-pad{padding:24px 40px 40px;}
+  .doc-paper textarea{width:100%;min-height:560px;border:none;resize:vertical;font-family:'Courier New',Consolas,monospace;font-size:13px;line-height:1.65;color:var(--ink);background:transparent;}
+  .doc-paper textarea:focus{outline:none;}
+  .template-option{border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;transition:border-color .15s,background .15s;}
+  .template-option:hover{border-color:var(--primary);}
+  .template-option.selected{border-color:var(--primary);background:var(--primary-tint);}
+  .template-option.disabled{opacity:.5;cursor:not-allowed;}
+  .template-option h4{margin:0 0 3px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;}
+  .template-option p{margin:0;font-size:12px;color:var(--ink-soft);line-height:1.4;}
+  .soon-tag{font-size:10.5px;background:var(--accent-tint);color:#8A5F26;padding:2px 7px;border-radius:20px;font-weight:600;}
+  .history-item{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:12px;flex-wrap:wrap;}
+  .history-item .meta h4{margin:0 0 3px;font-size:14px;}
+  .history-item .meta span{font-size:12.5px;color:var(--ink-soft);}
+  .settings-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:24px;max-width:640px;margin-bottom:20px;}
+  .letterhead-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;display:flex;gap:14px;align-items:center;margin-bottom:10px;}
+  .letterhead-card img{width:120px;height:60px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;padding:4px;}
+  .letterhead-card .meta{flex:1;}
+  .letterhead-card .meta h4{margin:0 0 3px;font-size:14px;}
+  .letterhead-card .meta span{font-size:12px;color:var(--ink-soft);display:block;}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:8px;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,0.25);z-index:100;opacity:0;transform:translateY(8px);transition:all .25s;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .loading-row{padding:40px;text-align:center;color:var(--ink-soft);font-size:13.5px;}
+  .hint{font-size:12px;color:var(--ink-soft);line-height:1.5;margin:4px 0 0;}
+  @media (max-width:900px){
+    .app{flex-direction:column;}
+    .sidebar{width:100%;flex-direction:row;overflow-x:auto;padding:14px;}
+    .brand{display:none;} .nav{flex-direction:row;padding:0;} .nav-spacer{display:none;} .sidebar-foot{display:none;}
+    .main{padding:22px 18px;}
+    .gen-layout{grid-template-columns:1fr;} .gen-panel{position:static;max-height:none;}
+    .form-grid{grid-template-columns:1fr;}
+    .salary-row{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">Dokumen HRD</div>
+      <div class="brand-sub">Otomasi surat &amp; arsip karyawan</div>
+    </div>
+    <div class="nav" id="nav">
+      <button data-tab="dashboard">📊&nbsp;&nbsp;Dashboard</button>
+      <button data-tab="karyawan">👥&nbsp;&nbsp;Karyawan</button>
+      <button data-tab="generator">📄&nbsp;&nbsp;Buat Dokumen</button>
+      <button data-tab="riwayat">🗂️&nbsp;&nbsp;Riwayat</button>
+      <button data-tab="pengaturan">⚙️&nbsp;&nbsp;Pengaturan</button>
+    </div>
+    <div class="nav-spacer"></div>
+    <div class="sidebar-foot">Data tersimpan otomatis &amp; dibagikan ke tim HRD yang membuka aplikasi ini.</div>
+  </div>
+  <div class="main" id="main"><div class="loading-row">Memuat data…</div></div>
+</div>
+<div id="modal-root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ STATE ============ */
+const state = {
+  tab: 'dashboard',
+  employees: [],
+  documents: [],
+  letterheads: [],
+  settings: { hrName:'', hrTitle:'Supervisor HRD', hrAddress:'', citySigning:'Purwokerto', employeeSheetUrl:'' },
+  loaded: false,
+  lastSync: null,
+  genSelectedEmployee: '',
+  genSelectedTemplate: 'pkwt',
+  genSelectedLetterhead: '',
+  genDocNumber: '',
+  genDraft: '',
+  karyawanSearch: '',
+  newLetterheadImg: null
+};
+
+const TEMPLATES = [
+  { id:'pkwt', name:'Surat Perjanjian Kerja (PKWT)', desc:'Kontrak kerja karyawan dengan rincian tugas & komponen gaji.', ready:true },
+  { id:'training', name:'Surat Perjanjian Masa Kerja Training', desc:'Perjanjian masa training sebelum menjadi kontrak.', ready:false },
+  { id:'teguran', name:'Surat Teguran (ST)', desc:'Teguran tertulis atas pelanggaran ringan.', ready:false },
+  { id:'sp', name:'Surat Peringatan (SP 1/2/3)', desc:'Peringatan formal bertingkat.', ready:false },
+  { id:'memo', name:'Internal Memo', desc:'Memo internal antar departemen.', ready:false },
+  { id:'keterangan', name:'Surat Keterangan Kerja', desc:'Bukti pernah/sedang bekerja di perusahaan.', ready:false }
+];
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function esc(s){ return (s==null?'':String(s)).replace(/</g,'&lt;'); }
+
+/* ============ IMPORT SPREADSHEET HELPERS ============ */
+const FIELD_ALIASES = {
+  nama: ['nama','nama lengkap','name','nama karyawan'],
+  tempatLahir: ['tempat lahir','tempatlahir','tempat'],
+  tanggalLahir: ['tanggal lahir','tgl lahir','tanggallahir'],
+  noKtp: ['no ktp','noktp','nik','nomor ktp'],
+  alamat: ['alamat','address'],
+  jabatan: ['jabatan','posisi','position'],
+  departemen: ['departemen','department','divisi'],
+  status: ['status'],
+  tanggalMulai: ['tanggal mulai','tgl mulai','mulai kontrak','tanggal mulai kontrak'],
+  tanggalSelesai: ['tanggal selesai','tgl selesai','selesai kontrak','tanggal selesai kontrak'],
+  jangkaWaktu: ['jangka waktu','durasi','jangkawaktu']
+};
+function normHeader(h){ return (h||'').toString().trim().toLowerCase().replace(/\s+/g,' '); }
+function matchField(header){
+  const h = normHeader(header);
+  for(const key in FIELD_ALIASES){ if(FIELD_ALIASES[key].includes(h)) return key; }
+  return null;
+}
+function parseSalaryHeader(header){
+  const h = (header||'').trim();
+  const m = h.match(/^(.*?)\s*\/\s*(hari|bulan)\s*$/i);
+  if(m) return { label: m[1].trim(), unit: /hari/i.test(m[2]) ? 'Hari' : 'Bulan' };
+  return { label: h, unit: 'Bulan' };
+}
+function toISODate(v){
+  if(!v) return '';
+  v = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  let m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(m){ return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  return v;
+}
+function parseIndoNumber(v){
+  if(v==null) return null;
+  let s = String(v).trim();
+  if(s==='') return null;
+  const neg = /^-/.test(s) || /^\(.*\)$/.test(s);
+  const digits = s.replace(/[^\d]/g,'');
+  if(digits==='') return null;
+  let n = parseInt(digits,10);
+  if(neg) n = -Math.abs(n);
+  return n;
+}
+function parseDelimited(text){
+  const firstLine = (text.split(/\r?\n/)[0]||'');
+  if(firstLine.includes('\t')){
+    return text.split(/\r?\n/).filter(l=>l.trim()!=='').map(line => line.split('\t').map(c=>c.trim()));
+  }
+  const rows = []; let row = [], field = '', inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){ if(text[i+1] === '"'){ field+='"'; i++; } else { inQuotes = false; } }
+      else field += c;
+    } else {
+      if(c === '"'){ inQuotes = true; }
+      else if(c === ','){ row.push(field); field=''; }
+      else if(c === '\n' || c === '\r'){
+        if(c === '\r' && text[i+1]==='\n') i++;
+        row.push(field); field='';
+        if(row.some(x=>x.trim()!=='')) rows.push(row);
+        row = [];
+      } else field += c;
+    }
+  }
+  if(field!=='' || row.length){ row.push(field); if(row.some(x=>x.trim()!=='')) rows.push(row); }
+  return rows;
+}
+async function fetchAppsScriptCsv(url){
+  if(!/^https?:\/\//i.test(url)) throw new Error('Link tidak valid.');
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('Gagal mengambil data (status ' + res.status + '). Pastikan deployment diatur "Who has access: Anyone".');
+  return await res.text();
+}
+const APPS_SCRIPT_CODE = `function doGet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var csv = data.map(function(row){
+    return row.map(function(cell){
+      var val = (cell === null || cell === undefined) ? '' : String(cell);
+      if (val.indexOf(',') !== -1 || val.indexOf('"') !== -1 || val.indexOf('\\n') !== -1) {
+        val = '"' + val.replace(/"/g, '""') + '"';
+      }
+      return val;
+    }).join(',');
+  }).join('\\n');
+  return ContentService.createTextOutput(csv).setMimeType(ContentService.MimeType.CSV);
+}`;
+function buildEmployeesFromRows(rows){
+  if(rows.length < 2) return { employees: [], extraCols: [] };
+  const headers = rows[0];
+  const fieldCols = {}; const extraColsIdx = [];
+  headers.forEach((h, i) => {
+    const f = matchField(h);
+    if(f) fieldCols[f] = i; else extraColsIdx.push(i);
+  });
+  const dataRows = rows.slice(1).filter(r => r.some(c => (c||'').trim() !== ''));
+  const salaryColIdx = extraColsIdx.filter(i => {
+    const vals = dataRows.map(r => r[i]).filter(v => (v||'').trim() !== '');
+    if(vals.length === 0) return false;
+    return vals.every(v => parseIndoNumber(v) !== null);
+  });
+  const ignoredCols = extraColsIdx.filter(i => !salaryColIdx.includes(i)).map(i => headers[i]);
+
+  const employees = dataRows.map(r => {
+    const get = (f) => fieldCols[f] !== undefined ? (r[fieldCols[f]]||'').trim() : '';
+    const salaryComponents = salaryColIdx
+      .filter(i => (r[i]||'').toString().trim() !== '')
+      .map(i => {
+        const { label, unit } = parseSalaryHeader(headers[i]);
+        return { id: uid(), label, amount: parseIndoNumber(r[i]) || 0, unit, note:'' };
+      });
+    return {
+      id: uid(),
+      nama: get('nama'),
+      tempatLahir: get('tempatLahir'),
+      tanggalLahir: toISODate(get('tanggalLahir')),
+      noKtp: get('noKtp'),
+      alamat: get('alamat'),
+      jabatan: get('jabatan'),
+      departemen: get('departemen'),
+      status: (/tetap/i.test(get('status')) ? 'Tetap' : 'Kontrak'),
+      tanggalMulai: toISODate(get('tanggalMulai')),
+      tanggalSelesai: toISODate(get('tanggalSelesai')),
+      jangkaWaktu: get('jangkaWaktu'),
+      salaryComponents
+    };
+  }).filter(e => e.nama);
+
+  return { employees, ignoredCols };
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+/* ============ STORAGE ============ */
+async function loadAll(){
+  try{
+    const [emp, docs, lh, set] = await Promise.all([
+      window.storage.get('employees-list', true).catch(()=>null),
+      window.storage.get('documents-list', true).catch(()=>null),
+      window.storage.get('letterheads-list', true).catch(()=>null),
+      window.storage.get('settings', true).catch(()=>null)
+    ]);
+    state.employees = emp ? JSON.parse(emp.value) : [];
+    state.documents = docs ? JSON.parse(docs.value) : [];
+    state.letterheads = lh ? JSON.parse(lh.value) : [];
+    state.settings = set ? JSON.parse(set.value) : state.settings;
+  }catch(e){ console.error('Gagal memuat data', e); }
+  state.loaded = true;
+  render();
+  if(state.settings.employeeSheetUrl){
+    syncEmployeesFromSheet(false).then(ok => { if(ok) render(); });
+  }
+}
+async function saveEmployees(){ try{ await window.storage.set('employees-list', JSON.stringify(state.employees), true);}catch(e){showToast('Gagal menyimpan data karyawan');} }
+async function saveDocuments(){ try{ await window.storage.set('documents-list', JSON.stringify(state.documents), true);}catch(e){showToast('Gagal menyimpan riwayat dokumen');} }
+async function saveLetterheads(){ try{ await window.storage.set('letterheads-list', JSON.stringify(state.letterheads), true);}catch(e){showToast('Gagal menyimpan kop surat');} }
+async function saveSettings(){ try{ await window.storage.set('settings', JSON.stringify(state.settings), true);}catch(e){showToast('Gagal menyimpan pengaturan');} }
+
+/* ============ SYNC KARYAWAN DARI SPREADSHEET ============ */
+async function syncEmployeesFromSheet(announce){
+  const url = state.settings.employeeSheetUrl;
+  if(!url) return false;
+  try{
+    const text = await fetchAppsScriptCsv(url);
+    const rows = parseDelimited(text);
+    const { employees } = buildEmployeesFromRows(rows);
+    if(employees.length === 0) throw new Error('Tidak ada baris valid di spreadsheet.');
+    state.employees = employees;
+    state.lastSync = Date.now();
+    await saveEmployees();
+    if(announce) showToast(`Disinkronkan: ${employees.length} karyawan dari spreadsheet`);
+    return true;
+  }catch(err){
+    if(announce) showToast('Gagal sinkron: ' + err.message);
+    return false;
+  }
+}
+
+/* ============ HELPERS ============ */
+function fmtDate(d){
+  if(!d) return '-';
+  const dt = new Date(d);
+  if(isNaN(dt)) return d;
+  return dt.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+}
+function fmtRupiah(n){
+  const num = Number(n)||0;
+  const abs = Math.abs(num).toLocaleString('id-ID');
+  return (num<0?'-':'') + 'Rp. ' + abs + ',-';
+}
+function todayStr(){ return new Date().toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' }); }
+const ROMAN_MONTH = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+
+function suggestDocNumber(letterhead){
+  const now = new Date();
+  const running = String(state.documents.filter(d=>d.templateId==='pkwt').length + 1).padStart(5,'0');
+  const code = letterhead ? (letterhead.companyCode || 'HRD') : 'HRD';
+  const yy = String(now.getFullYear()).slice(-2);
+  const roman = ROMAN_MONTH[now.getMonth()];
+  return `${running}/SPK/HRD-${code}/INT.${yy}/${roman}/${now.getFullYear()}`;
+}
+
+const SIG_COL2 = 52;
+function padSignatureCols(left, right){
+  return left.padEnd(SIG_COL2, ' ') + right;
+}
+function buildCenteredSignatureBlock(namaKedua, hrName, hrTitle){
+  const leftLine = `(${namaKedua})`;
+  const nameRight = `(${hrName})`;
+  const titleRight = (hrTitle || '').trim();
+  const maxLen = Math.max(nameRight.length, titleRight.length);
+  const namePad = ' '.repeat(Math.floor((maxLen - nameRight.length) / 2));
+  const titlePad = ' '.repeat(Math.floor((maxLen - titleRight.length) / 2));
+  const line1 = leftLine.padEnd(SIG_COL2, ' ') + namePad + nameRight;
+  const line2 = titleRight ? ' '.repeat(SIG_COL2) + titlePad + titleRight : '';
+  return line2 ? `${line1}\n${line2}` : line1;
+}
+
+/* ============ PKWT TEMPLATE ============ */
+function generatePkwtText(emp, settings, letterhead, docNumber){
+  const companyName = letterhead ? (letterhead.companyName || '[Nama Perusahaan]') : '[Nama Perusahaan]';
+  const hrName = settings.hrName || '[Nama Penandatangan]';
+  const hrTitle = settings.hrTitle || 'Supervisor HRD';
+  const hrAddress = settings.hrAddress || '[Alamat Penandatangan]';
+  const city = settings.citySigning || '[Kota]';
+
+  const nama = emp.nama || '[Nama Karyawan]';
+  const ttl = `${emp.tempatLahir||'[Tempat Lahir]'}, ${fmtDate(emp.tanggalLahir)}`;
+  const alamat = emp.alamat || '[Alamat Karyawan]';
+  const noKtp = emp.noKtp || '[No. KTP]';
+  const jabatan = emp.jabatan || '[Jabatan]';
+  const dept = emp.departemen || '[Departemen]';
+  const jangka = emp.jangkaWaktu || '[Jangka Waktu]';
+  const mulai = fmtDate(emp.tanggalMulai);
+  const selesai = fmtDate(emp.tanggalSelesai);
+  const today = todayStr();
+
+  const comps = ((emp.salaryComponents || []).filter(c => (c.label||'').trim() && Number(c.amount) !== 0));
+  const maxLabelLen = comps.reduce((m,c) => Math.max(m, (c.label||'').trim().length), 0);
+  const padWidth = maxLabelLen + 3;
+
+  const salaryLines = comps.length ? comps.map(c => {
+    const label = (c.label||'-').trim().padEnd(padWidth,' ');
+    const amount = fmtRupiah(c.amount);
+    const noteTxt = c.note ? `  *${c.note}` : '';
+    return `      - ${label}${amount} / ${c.unit||'Bulan'}${noteTxt}`;
+  }).join('\n') : '      (Belum ada komponen gaji yang diisi)';
+
+  return `SURAT PERJANJIAN KERJA
+Nomor : ${docNumber}
+
+Yang bertanda tangan dibawah ini
+   1. Nama                 : ${hrName}
+      Jabatan              : ${hrTitle}
+      Alamat               : ${hrAddress}
+
+Dalam hal ini mewakili HRD ${companyName} yang selanjutnya disebut sebagai PIHAK PERTAMA
+
+   2. N a m a               : ${nama}
+      Tempat/Tanggal Lahir : ${ttl}
+      Alamat               : ${alamat}
+      Nomor KTP            : ${noKtp}
+
+Kedua belah pihak telah sepakat mengadakan perjanjian bahwa PIHAK KEDUA akan melakukan pekerjaan berdasarkan kontrak untuk kepentingan PIHAK PERTAMA dengan syarat-syarat sebagai berikut :
+
+1. PIHAK KEDUA akan melakukan
+   a. Pekerjaan sebagai ${jabatan} di Departemen ${dept} untuk jangka waktu ${jangka} terhitung mulai tanggal ${mulai} sampai dengan ${selesai}.
+   b. Sesuai dengan sifat pekerjaannya, PIHAK KEDUA bersedia dan siap bekerja di dalam maupun di luar jam kerja perusahaan.
+   c. PIHAK KEDUA diwajibkan menyimpan rahasia perusahaan yang diketahui karena tugasnya, dan tidak dibenarkan mengadakan hubungan kerja dengan PIHAK KETIGA selama perjanjian kerja ini berjalan, tanpa persetujuan tertulis dari PIHAK PERTAMA.
+
+2. PIHAK KEDUA berkewajiban
+   a. Bekerja dengan bersungguh-sungguh, tertib, benar, tepat waktu untuk kepentingan perusahaan sesuai petunjuk atasan langsungnya.
+   b. Mematuhi peraturan dan instruksi-instruksi yang layak diberikan oleh PIHAK PERTAMA dalam rangka pelaksanaan tugas kewajiban, dengan segala sanksinya sesuai Peraturan Perusahaan.
+
+3. PIHAK PERTAMA berkewajiban :
+   a. Membayar PIHAK KEDUA selama masa kontrak sebesar:
+${salaryLines}
+
+4. Apabila selama dalam masa Perjanjian Kerja PIHAK KEDUA menunjukan disiplin, dedikasi dan loyalitas yang tinggi kepada Perusahaan, maka apabila dipandang perlu serta melalui kesepakatan kedua belah pihak perjanjian ini dapat diperpanjang masa berlakunya dengan dibuatkan kontrak baru.
+
+5. Apabila selama masa perjanjian kerja, PIHAK KEDUA tidak menunjukan prestasi kerja yang baik (tidak mampu melaksanakan pekerjaan yang diberikan oleh PIHAK PERTAMA) maka PIHAK PERTAMA dapat memutuskan perjanjian kerja ini secara sepihak tanpa kompensasi & Benefit.
+
+6. Dalam hal PIHAK KEDUA mengundurkan diri, wajib mengajukan permohonan secara tertulis satu bulan sebelumnya. Jika tidak sesuai hal tersebut, maka gaji di bulan tersebut & surat keterangan kerja tidak diberikan.
+
+7. Surat Perjanjian kerja ini dibuat, bermaterai cukup yang masing-masing mempunyai kekuatan hukum yang sama dan ditanda tangani oleh kedua belah pihak dalam keadaan sadar, sehat dan tanpa paksaan dari siapapun juga.
+
+
+${city}, ${today}
+
+${padSignatureCols('PIHAK KEDUA', 'PIHAK PERTAMA')}
+
+
+${buildCenteredSignatureBlock(nama, hrName, hrTitle)}`;
+}
+
+/* ============ RENDER ROOT ============ */
+function render(){
+  const main = document.getElementById('main');
+  document.querySelectorAll('#nav button').forEach(b=> b.classList.toggle('active', b.dataset.tab === state.tab));
+  if(!state.loaded){ main.innerHTML = `<div class="loading-row">Memuat data…</div>`; return; }
+  if(state.tab === 'dashboard') return renderDashboard(main);
+  if(state.tab === 'karyawan') return renderKaryawan(main);
+  if(state.tab === 'generator') return renderGenerator(main);
+  if(state.tab === 'riwayat') return renderRiwayat(main);
+  if(state.tab === 'pengaturan') return renderPengaturan(main);
+}
+
+/* ============ DASHBOARD ============ */
+function renderDashboard(main){
+  const total = state.employees.length;
+  const tetap = state.employees.filter(e=>e.status==='Tetap').length;
+  const kontrak = state.employees.filter(e=>e.status==='Kontrak').length;
+  const totalDocs = state.documents.length;
+  const recentDocs = [...state.documents].sort((a,b)=> b.createdAt - a.createdAt).slice(0,4);
+
+  main.innerHTML = `
+    <div class="page-head"><h1>Dashboard</h1><p>Ringkasan data karyawan dan aktivitas pembuatan dokumen di tim HRD Anda.</p></div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Karyawan</div></div>
+      <div class="stat-card"><div class="stat-num">${tetap}</div><div class="stat-label">Karyawan Tetap</div></div>
+      <div class="stat-card"><div class="stat-num">${kontrak}</div><div class="stat-label">Karyawan Kontrak</div></div>
+      <div class="stat-card"><div class="stat-num">${totalDocs}</div><div class="stat-label">Dokumen Dibuat</div></div>
+    </div>
+    <div class="section-title">Mulai cepat</div>
+    <div class="quick-actions" style="margin-bottom:32px;">
+      <div class="quick-card"><h3>Tambah karyawan baru</h3><p>Masukkan data karyawan lengkap dengan rincian gaji ke database.</p><button class="btn btn-sm" id="qa-add-emp">+ Tambah Karyawan</button></div>
+      <div class="quick-card"><h3>Buat PKWT</h3><p>Pilih karyawan &amp; kop surat, dokumen terisi otomatis.</p><button class="btn btn-sm btn-outline" id="qa-gen">Buka Generator</button></div>
+      <div class="quick-card"><h3>Kelola kop surat</h3><p>Upload kop surat perusahaan Anda di Pengaturan.</p><button class="btn btn-sm btn-outline" id="qa-settings">Buka Pengaturan</button></div>
+    </div>
+    <div class="section-title">Dokumen terbaru</div>
+    ${ recentDocs.length === 0
+      ? `<div class="table-wrap"><div class="empty-state"><h3>Belum ada dokumen</h3><p>Dokumen yang Anda buat akan muncul di sini.</p></div></div>`
+      : recentDocs.map(d => `
+        <div class="history-item">
+          <div class="meta"><h4>${esc(d.templateName)} — ${esc(d.employeeName)}</h4><span>${fmtDate(new Date(d.createdAt))}</span></div>
+          <div class="row-actions"><button class="btn btn-sm btn-outline" data-view-doc="${d.id}">Lihat</button></div>
+        </div>`).join('')
+    }`;
+
+  main.querySelector('#qa-add-emp').onclick = () => openEmployeeModal();
+  main.querySelector('#qa-gen').onclick = () => { state.tab='generator'; render(); };
+  main.querySelector('#qa-settings').onclick = () => { state.tab='pengaturan'; render(); };
+  main.querySelectorAll('[data-view-doc]').forEach(b=>{
+    b.onclick = () => { state.tab='riwayat'; render(); setTimeout(()=>openDocViewModal(b.dataset.viewDoc),0); };
+  });
+}
+
+/* ============ KARYAWAN ============ */
+function renderKaryawan(main){
+  const q = state.karyawanSearch.toLowerCase();
+  const list = state.employees.filter(e =>
+    !q || (e.nama||'').toLowerCase().includes(q) || (e.jabatan||'').toLowerCase().includes(q) || (e.departemen||'').toLowerCase().includes(q)
+  );
+  main.innerHTML = `
+    <div class="page-head"><h1>Data Karyawan</h1><p>Kelola data karyawan termasuk rincian komponen gaji sebagai sumber pembuatan dokumen otomatis.</p></div>
+    ${ state.settings.employeeSheetUrl ? `
+      <div class="quick-card" style="margin-bottom:16px;flex-direction:row;align-items:center;justify-content:space-between;">
+        <div>
+          <h3 style="margin-bottom:2px;">🔄 Sinkron real-time aktif</h3>
+          <p>Data diambil langsung dari Spreadsheet. ${state.lastSync ? 'Terakhir sinkron ' + new Date(state.lastSync).toLocaleTimeString('id-ID') : ''} — edit data di spreadsheet, lalu tekan Sinkron.</p>
+        </div>
+        <button class="btn btn-sm btn-outline" id="sync-now-btn">Sinkron Sekarang</button>
+      </div>` : ''}
+    <div class="toolbar">
+      <input class="search-input" id="search" placeholder="Cari nama, jabatan, atau departemen…" value="${esc(state.karyawanSearch)}">
+      <div class="row-actions">
+        <button class="btn btn-outline" id="import-btn">Import dari Spreadsheet</button>
+        <button class="btn" id="add-emp-btn">+ Tambah Karyawan</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      ${ list.length === 0 ? `
+        <div class="empty-state">
+          <h3>${state.employees.length===0 ? 'Belum ada karyawan' : 'Tidak ditemukan'}</h3>
+          <p>${state.employees.length===0 ? 'Tambahkan karyawan pertama untuk mulai membuat dokumen.' : 'Coba kata kunci pencarian lain.'}</p>
+        </div>` : `
+        <table>
+          <thead><tr><th>Nama</th><th>Jabatan</th><th>Departemen</th><th>Status</th><th>Mulai Kontrak</th><th></th></tr></thead>
+          <tbody>
+            ${list.map(e => `
+              <tr>
+                <td><strong>${esc(e.nama)}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${esc(e.noKtp||'')}</span></td>
+                <td>${esc(e.jabatan)}</td>
+                <td>${esc(e.departemen)}</td>
+                <td><span class="badge ${e.status==='Tetap'?'badge-tetap':'badge-kontrak'}">${esc(e.status||'Kontrak')}</span></td>
+                <td>${fmtDate(e.tanggalMulai)}</td>
+                <td><div class="row-actions">
+                  <button class="btn btn-sm btn-outline" data-edit="${e.id}">Edit</button>
+                  <button class="btn btn-sm btn-outline" data-doc="${e.id}">Buat Dok</button>
+                  <button class="btn btn-sm btn-danger" data-del="${e.id}">Hapus</button>
+                </div></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`}
+    </div>`;
+
+  main.querySelector('#search').oninput = (e) => { state.karyawanSearch = e.target.value; renderKaryawan(main); };
+  main.querySelector('#add-emp-btn').onclick = () => openEmployeeModal();
+  main.querySelector('#import-btn').onclick = () => openImportModal();
+  const syncBtn = main.querySelector('#sync-now-btn');
+  if(syncBtn) syncBtn.onclick = async () => { syncBtn.disabled = true; syncBtn.textContent = 'Menyinkronkan…'; await syncEmployeesFromSheet(true); renderKaryawan(main); };
+  main.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEmployeeModal(b.dataset.edit));
+  main.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => { state.genSelectedEmployee = b.dataset.doc; state.tab = 'generator'; render(); });
+  main.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if(confirm('Hapus karyawan ini? Riwayat dokumen terkait tidak akan terhapus.')){
+      state.employees = state.employees.filter(e => e.id !== b.dataset.del);
+      await saveEmployees(); showToast('Karyawan dihapus'); renderKaryawan(main);
+    }
+  });
+}
+
+let importParsedRows = null;
+
+function openImportModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-overlay" id="overlay">
+      <div class="modal" style="max-width:680px;">
+        <h2>Import Karyawan dari Spreadsheet</h2>
+        <div class="row-actions" style="margin-bottom:16px;">
+          <button class="btn btn-sm" id="mode-link">Link Apps Script</button>
+          <button class="btn btn-sm btn-outline" id="mode-file">Upload File CSV</button>
+          <button class="btn btn-sm btn-outline" id="mode-paste">Tempel Data</button>
+        </div>
+        <div id="import-body"></div>
+        <div id="import-preview"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="cancel-btn">Batal</button>
+        </div>
+      </div>
+    </div>`;
+  const close = () => { root.innerHTML = ''; importParsedRows = null; };
+  document.getElementById('overlay').onclick = (e) => { if(e.target.id==='overlay') close(); };
+  document.getElementById('cancel-btn').onclick = close;
+
+  const body = document.getElementById('import-body');
+  const preview = document.getElementById('import-preview');
+  const modeButtons = { link: document.getElementById('mode-link'), file: document.getElementById('mode-file'), paste: document.getElementById('mode-paste') };
+
+  function setActiveMode(mode){
+    Object.keys(modeButtons).forEach(k => modeButtons[k].className = k===mode ? 'btn btn-sm' : 'btn btn-sm btn-outline');
+    preview.innerHTML = ''; importParsedRows = null;
+    if(mode === 'link'){
+      body.innerHTML = `
+        <div class="subsection" style="margin-top:0;padding-top:0;border-top:none;">
+          <p class="hint" style="margin-bottom:10px;">Link Google Sheets langsung sering diblokir browser (CORS). Cara paling stabil: pasang skrip kecil di Apps Script sheet Anda, lalu deploy sebagai Web App.</p>
+          <ol style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;padding-left:18px;margin:0 0 10px;">
+            <li>Buka sheet Anda → menu <strong>Extensions → Apps Script</strong></li>
+            <li>Hapus isi default, tempel kode di bawah ini</li>
+            <li><strong>Deploy → New deployment → Web app</strong></li>
+            <li>"Execute as": <strong>Me</strong> — "Who has access": <strong>Anyone</strong></li>
+            <li>Klik Deploy, salin URL Web App yang muncul, tempel di kolom bawah ini</li>
+          </ol>
+          <div style="position:relative;">
+            <pre style="background:#F5F4EF;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:11.5px;line-height:1.5;overflow-x:auto;max-height:160px;">${esc(APPS_SCRIPT_CODE)}</pre>
+            <button class="btn btn-sm btn-outline" id="copy-script-btn" style="position:absolute;top:8px;right:8px;">Salin Kode</button>
+          </div>
+        </div>
+        <div class="form-field" style="margin-top:14px;">
+          <label>Link Web App Apps Script</label>
+          <input id="sheet-link" placeholder="https://script.google.com/macros/s/....../exec">
+        </div>
+        <button class="btn btn-sm" id="fetch-sheet-btn" style="margin-top:10px;">Ambil Data</button>
+        <p class="hint">Catatan: siapa pun yang punya link Web App ini bisa membaca data sheet Anda — simpan link tersebut baik-baik.</p>`;
+      document.getElementById('copy-script-btn').onclick = () => {
+        navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(()=> showToast('Kode disalin')).catch(()=> showToast('Gagal menyalin, salin manual dari kotak di atas'));
+      };
+      document.getElementById('fetch-sheet-btn').onclick = async () => {
+        const url = document.getElementById('sheet-link').value.trim();
+        if(!url){ showToast('Tempel link Web App terlebih dahulu'); return; }
+        preview.innerHTML = `<p class="hint">Mengambil data…</p>`;
+        try{
+          const text = await fetchAppsScriptCsv(url);
+          handleParsedText(text);
+        }catch(err){
+          preview.innerHTML = `<p class="hint" style="color:var(--danger);">${esc(err.message)} Coba opsi "Upload File CSV" atau "Tempel Data" sebagai alternatif.</p>`;
+        }
+      };
+    } else if(mode === 'file'){
+      body.innerHTML = `
+        <div class="form-field"><label>File CSV</label><input type="file" id="csv-file" accept=".csv,text/csv"></div>
+        <p class="hint">Ekspor sheet Anda sebagai .csv (File → Download → CSV di Google Sheets, atau Save As CSV di Excel).</p>`;
+      document.getElementById('csv-file').onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => handleParsedText(ev.target.result);
+        reader.readAsText(file);
+      };
+    } else {
+      body.innerHTML = `
+        <div class="form-field">
+          <label>Tempel data (salin dari Excel/Google Sheets termasuk baris header)</label>
+          <textarea id="paste-area" rows="6" placeholder="Nama	Jabatan	Departemen	...&#10;Ahmad	Staff NOC	Numeta	..."></textarea>
+        </div>
+        <button class="btn btn-sm" id="process-paste-btn" style="margin-top:10px;">Proses Data</button>`;
+      document.getElementById('process-paste-btn').onclick = () => {
+        const text = document.getElementById('paste-area').value;
+        if(!text.trim()){ showToast('Tempel data terlebih dahulu'); return; }
+        handleParsedText(text);
+      };
+    }
+  }
+
+  function handleParsedText(text){
+    const rows = parseDelimited(text);
+    const { employees, ignoredCols } = buildEmployeesFromRows(rows);
+    if(employees.length === 0){
+      preview.innerHTML = `<p class="hint" style="color:var(--danger);">Tidak ada baris valid ditemukan. Pastikan ada kolom "Nama" dan baris header di paling atas.</p>`;
+      return;
+    }
+    importParsedRows = employees;
+    preview.innerHTML = `
+      <div class="subsection">
+        <p class="hint"><strong>${employees.length} karyawan</strong> siap diimpor.${ignoredCols && ignoredCols.length ? ` Kolom diabaikan (bukan angka/tidak dikenali): ${ignoredCols.map(esc).join(', ')}.` : ''}</p>
+        <div class="table-wrap" style="margin:10px 0;">
+          <table>
+            <thead><tr><th>Nama</th><th>Jabatan</th><th>Departemen</th><th>Komponen Gaji</th></tr></thead>
+            <tbody>
+              ${employees.slice(0,5).map(e => `
+                <tr>
+                  <td>${esc(e.nama)}</td><td>${esc(e.jabatan)}</td><td>${esc(e.departemen)}</td>
+                  <td>${e.salaryComponents.map(c=>esc(c.label)+' <span style="color:var(--ink-soft);">/'+esc(c.unit)+'</span>').join(', ') || '-'}</td>
+                </tr>`).join('')}
+              ${employees.length > 5 ? `<tr><td colspan="4" style="color:var(--ink-soft);">…dan ${employees.length-5} lainnya</td></tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+        <button class="btn" id="confirm-import-btn">Import ${employees.length} Karyawan</button>
+      </div>`;
+    document.getElementById('confirm-import-btn').onclick = async () => {
+      state.employees = state.employees.concat(importParsedRows);
+      await saveEmployees();
+      showToast(`${importParsedRows.length} karyawan berhasil diimpor`);
+      close();
+      render();
+    };
+  }
+
+  modeButtons.link.onclick = () => setActiveMode('link');
+  modeButtons.file.onclick = () => setActiveMode('file');
+  modeButtons.paste.onclick = () => setActiveMode('paste');
+  setActiveMode('link');
+}
+
+let modalSalaryDraft = [];
+
+function openEmployeeModal(editId){
+  const editing = editId ? state.employees.find(e=>e.id===editId) : null;
+  modalSalaryDraft = editing && editing.salaryComponents ? JSON.parse(JSON.stringify(editing.salaryComponents)) : [
+    { id: uid(), label:'Gaji Bulan Tetap', amount:'', unit:'Bulan', note:'' },
+    { id: uid(), label:'Uang Makan', amount:'', unit:'Hari', note:'' },
+    { id: uid(), label:'Uang Transport', amount:'', unit:'Hari', note:'' }
+  ];
+  const root = document.getElementById('modal-root');
+
+  function renderSalaryRows(){
+    return modalSalaryDraft.map(c => `
+      <div class="salary-row" data-row="${c.id}">
+        <input placeholder="Nama komponen (mis. Tunjangan Jabatan)" value="${esc(c.label)}" data-f="label">
+        <input type="number" placeholder="Nominal" value="${c.amount}" data-f="amount">
+        <select data-f="unit">
+          <option value="Bulan" ${c.unit==='Bulan'?'selected':''}>/ Bulan</option>
+          <option value="Hari" ${c.unit==='Hari'?'selected':''}>/ Hari</option>
+        </select>
+        <input placeholder="Catatan (opsional)" value="${esc(c.note||'')}" data-f="note">
+        <button class="icon-btn" data-remove-row="${c.id}" title="Hapus baris">✕</button>
+      </div>`).join('');
+  }
+
+  root.innerHTML = `
+    <div class="modal-overlay" id="overlay">
+      <div class="modal">
+        <h2>${editing ? 'Edit Karyawan' : 'Tambah Karyawan'}</h2>
+        <div class="form-grid">
+          <div class="form-field full"><label>Nama Lengkap</label><input id="f-nama" value="${esc(editing?.nama)}"></div>
+          <div class="form-field"><label>Tempat Lahir</label><input id="f-tempatlahir" value="${esc(editing?.tempatLahir)}"></div>
+          <div class="form-field"><label>Tanggal Lahir</label><input type="date" id="f-tgllahir" value="${editing?.tanggalLahir||''}"></div>
+          <div class="form-field"><label>Nomor KTP</label><input id="f-ktp" value="${esc(editing?.noKtp)}"></div>
+          <div class="form-field"><label>Status</label>
+            <select id="f-status">
+              <option ${editing?.status==='Kontrak'||!editing?'selected':''} value="Kontrak">Kontrak</option>
+              <option ${editing?.status==='Tetap'?'selected':''} value="Tetap">Tetap</option>
+            </select>
+          </div>
+          <div class="form-field full"><label>Alamat</label><input id="f-alamat" value="${esc(editing?.alamat)}"></div>
+          <div class="form-field"><label>Jabatan</label><input id="f-jabatan" value="${esc(editing?.jabatan)}"></div>
+          <div class="form-field"><label>Departemen</label><input id="f-dept" value="${esc(editing?.departemen)}"></div>
+          <div class="form-field"><label>Tanggal Mulai Kontrak</label><input type="date" id="f-mulai" value="${editing?.tanggalMulai||''}"></div>
+          <div class="form-field"><label>Tanggal Selesai Kontrak</label><input type="date" id="f-selesai" value="${editing?.tanggalSelesai||''}"></div>
+          <div class="form-field full"><label>Jangka Waktu (teks, mis. "1 (satu) tahun")</label><input id="f-jangka" value="${esc(editing?.jangkaWaktu)}"></div>
+        </div>
+
+        <div class="subsection">
+          <div class="subsection-title"><span>Komponen Gaji</span><button class="btn btn-sm btn-outline" id="add-salary-row">+ Tambah Baris</button></div>
+          <div id="salary-rows">${renderSalaryRows()}</div>
+          <p class="hint">Nominal boleh negatif untuk baris "Penyesuaian". Baris ini akan tersusun otomatis di dalam surat.</p>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="cancel-btn">Batal</button>
+          <button class="btn" id="save-btn">${editing?'Simpan Perubahan':'Tambah Karyawan'}</button>
+        </div>
+      </div>
+    </div>`;
+
+  const close = () => { root.innerHTML = ''; };
+  document.getElementById('overlay').onclick = (e) => { if(e.target.id==='overlay') close(); };
+  document.getElementById('cancel-btn').onclick = close;
+
+  function bindSalaryRowEvents(){
+    document.querySelectorAll('[data-row]').forEach(rowEl => {
+      const id = rowEl.dataset.row;
+      rowEl.querySelectorAll('[data-f]').forEach(input => {
+        input.oninput = () => {
+          const comp = modalSalaryDraft.find(c=>c.id===id);
+          comp[input.dataset.f] = input.value;
+        };
+      });
+    });
+    document.querySelectorAll('[data-remove-row]').forEach(btn => {
+      btn.onclick = () => {
+        modalSalaryDraft = modalSalaryDraft.filter(c => c.id !== btn.dataset.removeRow);
+        document.getElementById('salary-rows').innerHTML = renderSalaryRows();
+        bindSalaryRowEvents();
+      };
+    });
+  }
+  bindSalaryRowEvents();
+
+  document.getElementById('add-salary-row').onclick = () => {
+    modalSalaryDraft.push({ id: uid(), label:'', amount:'', unit:'Bulan', note:'' });
+    document.getElementById('salary-rows').innerHTML = renderSalaryRows();
+    bindSalaryRowEvents();
+  };
+
+  document.getElementById('save-btn').onclick = async () => {
+    const nama = document.getElementById('f-nama').value.trim();
+    if(!nama){ showToast('Nama wajib diisi'); return; }
+    const cleanSalary = modalSalaryDraft
+      .filter(c => (c.label||'').trim() && String(c.amount).trim() !== '')
+      .map(c => ({ id:c.id, label:c.label.trim(), amount: Number(c.amount)||0, unit:c.unit||'Bulan', note:(c.note||'').trim() }));
+    const data = {
+      id: editing ? editing.id : uid(),
+      nama,
+      tempatLahir: document.getElementById('f-tempatlahir').value.trim(),
+      tanggalLahir: document.getElementById('f-tgllahir').value,
+      noKtp: document.getElementById('f-ktp').value.trim(),
+      status: document.getElementById('f-status').value,
+      alamat: document.getElementById('f-alamat').value.trim(),
+      jabatan: document.getElementById('f-jabatan').value.trim(),
+      departemen: document.getElementById('f-dept').value.trim(),
+      tanggalMulai: document.getElementById('f-mulai').value,
+      tanggalSelesai: document.getElementById('f-selesai').value,
+      jangkaWaktu: document.getElementById('f-jangka').value.trim(),
+      salaryComponents: cleanSalary
+    };
+    if(editing){ state.employees = state.employees.map(e => e.id===editing.id ? data : e); }
+    else{ state.employees.push(data); }
+    await saveEmployees();
+    showToast(editing ? 'Perubahan disimpan' : 'Karyawan ditambahkan');
+    close(); render();
+  };
+}
+
+/* ============ GENERATOR ============ */
+function renderGenerator(main){
+  const emp = state.employees.find(e => e.id === state.genSelectedEmployee);
+  const tpl = TEMPLATES.find(t => t.id === state.genSelectedTemplate);
+  const letterhead = state.letterheads.find(l => l.id === state.genSelectedLetterhead);
+
+  if(!state.genDocNumber && emp && tpl && tpl.id==='pkwt'){
+    state.genDocNumber = suggestDocNumber(letterhead);
+  }
+
+  main.innerHTML = `
+    <div class="page-head"><h1>Buat Dokumen</h1><p>Pilih karyawan, kop surat, dan jenis dokumen — teks otomatis terisi dan dapat diedit sebelum disimpan atau dicetak.</p></div>
+    <div class="gen-layout">
+      <div class="gen-panel">
+        <div class="form-field">
+          <label>Karyawan</label>
+          <select id="sel-emp">
+            <option value="">— Pilih karyawan —</option>
+            ${state.employees.map(e => `<option value="${e.id}" ${e.id===state.genSelectedEmployee?'selected':''}>${esc(e.nama)} — ${esc(e.jabatan||'')}</option>`).join('')}
+          </select>
+          ${state.employees.length===0 ? `<p class="hint"><a href="#" id="goto-emp" style="color:var(--primary-dark);">+ Tambah karyawan</a> terlebih dahulu.</p>` : ''}
+        </div>
+
+        <div class="form-field">
+          <label>Kop Surat</label>
+          <select id="sel-lh">
+            <option value="">— Tanpa kop surat —</option>
+            ${state.letterheads.map(l => `<option value="${l.id}" ${l.id===state.genSelectedLetterhead?'selected':''}>${esc(l.label)}</option>`).join('')}
+          </select>
+          ${state.letterheads.length===0 ? `<p class="hint"><a href="#" id="goto-settings" style="color:var(--primary-dark);">+ Tambah kop surat</a> di Pengaturan.</p>` : ''}
+        </div>
+
+        <div>
+          <label style="font-size:12.5px;font-weight:600;color:var(--ink-soft);">Jenis Dokumen</label>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+            ${TEMPLATES.map(t => `
+              <div class="template-option ${t.id===state.genSelectedTemplate?'selected':''} ${!t.ready?'disabled':''}" data-tpl="${t.id}" data-ready="${t.ready}">
+                <h4>${t.name} ${!t.ready?'<span class="soon-tag">Segera hadir</span>':''}</h4>
+                <p>${t.desc}</p>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        ${ (emp && tpl && tpl.ready) ? `
+          <div class="form-field">
+            <label>Nomor Surat</label>
+            <input id="doc-number" value="${esc(state.genDocNumber)}">
+          </div>` : ''}
+
+        <button class="btn" id="btn-generate" ${(!emp||!tpl||!tpl.ready)?'disabled':''}>Buat Draf Dokumen</button>
+      </div>
+
+      <div class="doc-preview-wrap">
+        <div class="doc-preview-head">
+          <span>${ tpl && emp ? tpl.name + ' — ' + emp.nama : 'Pratinjau dokumen akan muncul di sini' }</span>
+          ${ state.genDraft ? `
+            <div class="row-actions">
+              <button class="btn btn-sm btn-outline" id="btn-print">Cetak</button>
+              <button class="btn btn-sm btn-outline" id="btn-download">Unduh PDF</button>
+              <button class="btn btn-sm" id="btn-save-doc">Simpan ke Riwayat</button>
+            </div>` : ''}
+        </div>
+        <div class="doc-paper">
+          ${ letterhead && state.genDraft ? `<div class="doc-letterhead"><img src="${letterhead.imageDataUrl}" alt="Kop surat"></div>` : '' }
+          <div class="doc-body-pad">
+            ${ state.genDraft
+              ? `<textarea id="doc-text">${state.genDraft}</textarea>`
+              : `<div class="empty-state"><h3>Belum ada draf</h3><p>Pilih karyawan &amp; jenis dokumen, lalu klik "Buat Draf Dokumen".</p></div>`
+            }
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const gotoEmp = main.querySelector('#goto-emp');
+  if(gotoEmp) gotoEmp.onclick = (e) => { e.preventDefault(); state.tab='karyawan'; render(); };
+  const gotoSettings = main.querySelector('#goto-settings');
+  if(gotoSettings) gotoSettings.onclick = (e) => { e.preventDefault(); state.tab='pengaturan'; render(); };
+
+  main.querySelector('#sel-emp').onchange = (e) => { state.genSelectedEmployee = e.target.value; state.genDraft=''; state.genDocNumber=''; renderGenerator(main); };
+  main.querySelector('#sel-lh').onchange = (e) => { state.genSelectedLetterhead = e.target.value; state.genDocNumber=''; state.genDraft=''; renderGenerator(main); };
+  main.querySelectorAll('[data-tpl]').forEach(el => el.onclick = () => {
+    if(el.dataset.ready !== 'true'){ showToast('Template ini sedang dikembangkan'); return; }
+    state.genSelectedTemplate = el.dataset.tpl; state.genDraft=''; renderGenerator(main);
+  });
+
+  const numInput = main.querySelector('#doc-number');
+  if(numInput) numInput.oninput = (e) => { state.genDocNumber = e.target.value; };
+
+  const genBtn = main.querySelector('#btn-generate');
+  if(genBtn) genBtn.onclick = () => {
+    if(!emp || !tpl || !tpl.ready) return;
+    const num = state.genDocNumber || suggestDocNumber(letterhead);
+    state.genDocNumber = num;
+    state.genDraft = generatePkwtText(emp, state.settings, letterhead, num);
+    renderGenerator(main);
+  };
+
+  const textarea = main.querySelector('#doc-text');
+  if(textarea) textarea.oninput = (e) => { state.genDraft = e.target.value; };
+
+  const printBtn = main.querySelector('#btn-print');
+  if(printBtn) printBtn.onclick = () => printDocument(tpl.name, state.genDraft, letterhead);
+  const dlBtn = main.querySelector('#btn-download');
+  if(dlBtn) dlBtn.onclick = () => downloadPdf(tpl.name, state.genDraft, letterhead, `${tpl.name} - ${emp.nama}`);
+
+  const saveBtn = main.querySelector('#btn-save-doc');
+  if(saveBtn) saveBtn.onclick = async () => {
+    const doc = {
+      id: uid(), employeeId: emp.id, employeeName: emp.nama,
+      templateId: tpl.id, templateName: tpl.name,
+      letterheadId: letterhead ? letterhead.id : '', letterheadImg: letterhead ? letterhead.imageDataUrl : '',
+      docNumber: state.genDocNumber, content: state.genDraft, createdAt: Date.now()
+    };
+    state.documents.push(doc);
+    await saveDocuments();
+    showToast('Dokumen disimpan ke riwayat');
+  };
+}
+
+function escFull(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function buildPrintableLines(text){
+  return text.split(/\r?\n/).map(line => {
+    if(line.trim() === '') return '<div>&nbsp;</div>';
+    let indentChars = 0;
+    const listMatch = line.match(/^(\s*)([A-Za-z0-9]{1,2}\.\s+)/);
+    if(listMatch){
+      indentChars = listMatch[1].length + listMatch[2].length;
+    } else {
+      const idx = line.indexOf(' : ');
+      if(idx !== -1) indentChars = idx + 3;
+    }
+    const escaped = escFull(line);
+    const style = indentChars > 0
+      ? `white-space:pre-wrap;padding-left:${indentChars}ch;text-indent:-${indentChars}ch;`
+      : `white-space:pre-wrap;`;
+    return `<div style="${style}">${escaped}</div>`;
+  }).join('');
+}
+
+function printDocument(title, text, letterhead){
+  const w = window.open('', '_blank');
+  w.document.write(`
+    <html><head><title>${esc(title)}</title>
+    <style>
+      @page{ margin: 18mm 18mm 16mm; }
+      *{box-sizing:border-box;}
+      html,body{width:100%;overflow-x:hidden;}
+      body{font-family:'Courier New',Consolas,monospace;font-size:11.5pt;line-height:1.6;margin:0;}
+      table{width:100%;table-layout:fixed;border-collapse:collapse;}
+      thead{display:table-header-group;}
+      thead td{padding:0 0 10px 0;text-align:center;}
+      .lh-img{display:block;width:100%;height:auto;margin:0 auto;}
+      tbody td{vertical-align:top;width:100%;}
+      .doc-lines div{font-family:'Courier New',Consolas,monospace;font-size:11.5pt;}
+    </style></head>
+    <body>
+      <table>
+        ${ letterhead ? `<thead><tr><td><img class="lh-img" src="${letterhead.imageDataUrl}"></td></tr></thead>` : '' }
+        <tbody><tr><td><div class="doc-lines">${buildPrintableLines(text)}</div></td></tr></tbody>
+      </table>
+    </body></html>`);
+  w.document.close(); w.focus();
+  setTimeout(()=> w.print(), 300);
+}
+function downloadText(filename, text){
+  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+/* ============ PDF EXPORT ============ */
+function loadScriptOnce(src){
+  return new Promise((resolve, reject) => {
+    if(document.querySelector(`script[data-src="${src}"]`)){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.dataset.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Gagal memuat pustaka PDF. Periksa koneksi internet.'));
+    document.head.appendChild(s);
+  });
+}
+async function ensureJsPDF(){
+  if(window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  if(!(window.jspdf && window.jspdf.jsPDF)) throw new Error('Pustaka PDF tidak tersedia.');
+  return window.jspdf.jsPDF;
+}
+function loadImageEl(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Gagal memuat gambar kop surat.'));
+    img.src = src;
+  });
+}
+function wordWrapPdf(text, width){
+  if(width < 5) width = 5;
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = []; let cur = '';
+  for(const w of words){
+    let word = w;
+    while(word.length > width){ // fallback for very long single tokens
+      if(cur){ lines.push(cur); cur=''; }
+      lines.push(word.slice(0, width));
+      word = word.slice(width);
+    }
+    if(cur === ''){ cur = word; }
+    else if((cur + ' ' + word).length <= width){ cur += ' ' + word; }
+    else { lines.push(cur); cur = word; }
+  }
+  if(cur) lines.push(cur);
+  if(lines.length === 0) lines.push('');
+  return lines;
+}
+
+async function downloadPdf(title, text, letterhead, filenameBase){
+  showToast('Menyiapkan PDF…');
+  try{
+    const JsPDFCtor = await ensureJsPDF();
+    const doc = new JsPDFCtor({ unit:'mm', format:'a4' });
+    doc.setFont('courier','normal');
+    const fontSize = 9;
+    doc.setFontSize(fontSize);
+    doc.setTextColor(20,20,20);
+
+    const marginLeft = 18, marginTop = 18, marginRight = 18, marginBottom = 16;
+    const pageHeight = 297, pageWidth = 210;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+    const charWidth = doc.getTextWidth('0') || 1.6;
+    const maxChars = Math.max(20, Math.floor(contentWidth / charWidth));
+    const lineHeight = fontSize * 0.3528 * 1.55;
+
+    let img = null, headerHeight = 0;
+    if(letterhead){
+      try{
+        img = await loadImageEl(letterhead.imageDataUrl);
+        headerHeight = contentWidth * (img.naturalHeight / img.naturalWidth);
+      }catch(e){ img = null; }
+    }
+    const startY = marginTop + (img ? headerHeight + 4 : 0);
+    function drawHeader(){
+      if(img){
+        const fmt = letterhead.imageDataUrl.indexOf('image/png') !== -1 ? 'PNG' : 'JPEG';
+        doc.addImage(letterhead.imageDataUrl, fmt, marginLeft, marginTop, contentWidth, headerHeight);
+      }
+    }
+
+    let y = startY;
+    drawHeader();
+
+    function newPageIfNeeded(){
+      if(y + lineHeight > pageHeight - marginBottom){
+        doc.addPage();
+        drawHeader();
+        y = startY;
+      }
+    }
+
+    const rawLines = text.split(/\r?\n/);
+    for(const rawLine of rawLines){
+      if(rawLine.trim() === ''){ y += lineHeight; newPageIfNeeded(); continue; }
+
+      let outputs;
+      if(rawLine.length <= maxChars){
+        outputs = [{ x:0, str: rawLine }];
+      } else {
+        let indentChars = 0;
+        const listMatch = rawLine.match(/^(\s*)([A-Za-z0-9]{1,2}\.\s+)/);
+        if(listMatch){ indentChars = listMatch[1].length + listMatch[2].length; }
+        else { const idx = rawLine.indexOf(' : '); if(idx !== -1) indentChars = idx + 3; }
+        const prefixText = rawLine.slice(0, indentChars);
+        const valueText = rawLine.slice(indentChars);
+        const chunkWidth = Math.max(10, maxChars - indentChars);
+        const chunks = wordWrapPdf(valueText, chunkWidth);
+        outputs = chunks.map((c,i) => i===0 ? { x:0, str: prefixText + c } : { x:indentChars, str: c });
+      }
+
+      for(const o of outputs){
+        newPageIfNeeded();
+        doc.text(o.str, marginLeft + o.x * charWidth, y);
+        y += lineHeight;
+      }
+    }
+
+    doc.save(`${filenameBase}.pdf`);
+    showToast('PDF berhasil diunduh');
+  }catch(err){
+    console.error(err);
+    showToast('Gagal membuat PDF: ' + err.message);
+  }
+}
+
+/* ============ RIWAYAT ============ */
+function renderRiwayat(main){
+  const docs = [...state.documents].sort((a,b)=> b.createdAt - a.createdAt);
+  main.innerHTML = `
+    <div class="page-head"><h1>Riwayat Dokumen</h1><p>Semua dokumen yang telah dibuat dan disimpan oleh tim HRD.</p></div>
+    ${ docs.length === 0
+      ? `<div class="table-wrap"><div class="empty-state"><h3>Belum ada riwayat</h3><p>Dokumen yang Anda simpan dari halaman "Buat Dokumen" akan muncul di sini.</p></div></div>`
+      : docs.map(d => `
+        <div class="history-item">
+          <div class="meta"><h4>${esc(d.templateName)} — ${esc(d.employeeName)}</h4><span>${esc(d.docNumber||'')} · Dibuat ${fmtDate(new Date(d.createdAt))}</span></div>
+          <div class="row-actions">
+            <button class="btn btn-sm btn-outline" data-view="${d.id}">Lihat</button>
+            <button class="btn btn-sm btn-danger" data-del="${d.id}">Hapus</button>
+          </div>
+        </div>`).join('')
+    }`;
+  main.querySelectorAll('[data-view]').forEach(b => b.onclick = () => openDocViewModal(b.dataset.view));
+  main.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if(confirm('Hapus dokumen ini dari riwayat?')){
+      state.documents = state.documents.filter(d => d.id !== b.dataset.del);
+      await saveDocuments(); showToast('Dokumen dihapus'); renderRiwayat(main);
+    }
+  });
+}
+
+function openDocViewModal(docId){
+  const doc = state.documents.find(d => d.id === docId);
+  if(!doc) return;
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-overlay" id="overlay">
+      <div class="modal" style="max-width:680px;">
+        <h2>${esc(doc.templateName)} — ${esc(doc.employeeName)}</h2>
+        ${ doc.letterheadImg ? `<img src="${doc.letterheadImg}" style="max-width:100%;margin-bottom:14px;">` : '' }
+        <div class="doc-paper" style="padding:0;">
+          <textarea id="view-text" style="min-height:420px;">${esc(doc.content)}</textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="close-btn">Tutup</button>
+          <button class="btn btn-outline" id="dl-btn">Unduh PDF</button>
+          <button class="btn" id="print-btn">Cetak</button>
+        </div>
+      </div>
+    </div>`;
+  const close = () => { root.innerHTML = ''; };
+  document.getElementById('overlay').onclick = (e) => { if(e.target.id==='overlay') close(); };
+  document.getElementById('close-btn').onclick = close;
+  document.getElementById('dl-btn').onclick = () => downloadPdf(doc.templateName, document.getElementById('view-text').value, doc.letterheadImg ? {imageDataUrl:doc.letterheadImg} : null, `${doc.templateName} - ${doc.employeeName}`);
+  document.getElementById('print-btn').onclick = () => printDocument(doc.templateName, document.getElementById('view-text').value, doc.letterheadImg ? {imageDataUrl:doc.letterheadImg} : null);
+}
+
+/* ============ PENGATURAN ============ */
+function renderPengaturan(main){
+  const s = state.settings;
+  main.innerHTML = `
+    <div class="page-head"><h1>Pengaturan</h1><p>Data penandatangan dan kop surat akan otomatis muncul di setiap dokumen yang dibuat.</p></div>
+
+    <div class="settings-card">
+      <div class="section-title" style="margin-bottom:16px;">Data Penandatangan (Pihak Pertama)</div>
+      <div class="form-field" style="margin-bottom:14px;"><label>Nama Penandatangan</label><input id="s-hrname" value="${esc(s.hrName)}"></div>
+      <div class="form-field" style="margin-bottom:14px;"><label>Jabatan Penandatangan</label><input id="s-hrtitle" value="${esc(s.hrTitle)}"></div>
+      <div class="form-field" style="margin-bottom:14px;"><label>Alamat Penandatangan</label><input id="s-hraddr" value="${esc(s.hrAddress)}"></div>
+      <div class="form-field" style="margin-bottom:20px;"><label>Kota Penandatanganan</label><input id="s-city" value="${esc(s.citySigning)}"></div>
+      <button class="btn" id="s-save">Simpan Pengaturan</button>
+    </div>
+
+    <div class="settings-card">
+      <div class="section-title">Sumber Data Karyawan (Real-time)</div>
+      <p class="hint" style="margin-bottom:14px;">Hubungkan ke Spreadsheet yang sama dengan yang dipakai tim HRD lain — setiap kali aplikasi dibuka di laptop siapa pun, data karyawan otomatis disamakan dari sana. Pakai Web App Apps Script yang sama seperti fitur Import (lihat panduan di menu Karyawan → Import dari Spreadsheet).</p>
+      <div class="form-field" style="margin-bottom:12px;">
+        <label>Link Web App Apps Script</label>
+        <input id="s-sheeturl" value="${esc(s.employeeSheetUrl)}" placeholder="https://script.google.com/macros/s/....../exec">
+      </div>
+      <div class="row-actions">
+        <button class="btn" id="s-sync-save">Simpan &amp; Sinkron Sekarang</button>
+        ${ s.employeeSheetUrl ? `<button class="btn btn-outline btn-danger" id="s-sync-off">Nonaktifkan Sinkron</button>` : '' }
+      </div>
+      ${ s.employeeSheetUrl && state.lastSync ? `<p class="hint" style="margin-top:10px;">Terakhir sinkron: ${new Date(state.lastSync).toLocaleString('id-ID')}</p>` : '' }
+    </div>
+
+    <div class="settings-card">
+      <div class="section-title">Kop Surat</div>
+      <p class="hint" style="margin-bottom:16px;">Upload kop surat untuk tiap perusahaan/brand. Gambar akan otomatis dikompres agar tetap ringan.</p>
+      <div id="lh-list">
+        ${ state.letterheads.length === 0 ? `<p class="hint">Belum ada kop surat.</p>` :
+          state.letterheads.map(l => `
+            <div class="letterhead-card">
+              <img src="${l.imageDataUrl}">
+              <div class="meta">
+                <h4>${esc(l.label)}</h4>
+                <span>Nama resmi: ${esc(l.companyName)}</span>
+                <span>Kode: ${esc(l.companyCode)}</span>
+              </div>
+              <button class="btn btn-sm btn-danger" data-del-lh="${l.id}">Hapus</button>
+            </div>`).join('')
+        }
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title"><span>Tambah Kop Surat Baru</span></div>
+        <div class="form-grid">
+          <div class="form-field"><label>Label (untuk internal, mis. "Kop Numeta")</label><input id="lh-label"></div>
+          <div class="form-field"><label>Kode Perusahaan (untuk nomor surat, mis. LKM)</label><input id="lh-code"></div>
+          <div class="form-field full"><label>Nama Resmi Perusahaan (untuk teks "mewakili HRD ...")</label><input id="lh-company" placeholder="PT. Luzie Kreatif Mandiri"></div>
+          <div class="form-field full"><label>Gambar Kop Surat</label><input type="file" id="lh-file" accept="image/*"></div>
+        </div>
+        <div id="lh-preview" style="margin-top:10px;"></div>
+        <button class="btn" id="lh-add-btn" style="margin-top:14px;">+ Tambah Kop Surat</button>
+      </div>
+    </div>`;
+
+  main.querySelector('#s-save').onclick = async () => {
+    state.settings = {
+      ...state.settings,
+      hrName: main.querySelector('#s-hrname').value.trim(),
+      hrTitle: main.querySelector('#s-hrtitle').value.trim() || 'Supervisor HRD',
+      hrAddress: main.querySelector('#s-hraddr').value.trim(),
+      citySigning: main.querySelector('#s-city').value.trim() || 'Purwokerto'
+    };
+    await saveSettings();
+    showToast('Pengaturan disimpan');
+  };
+
+  const syncSaveBtn = main.querySelector('#s-sync-save');
+  if(syncSaveBtn) syncSaveBtn.onclick = async () => {
+    const url = main.querySelector('#s-sheeturl').value.trim();
+    if(!url){ showToast('Tempel link Web App terlebih dahulu'); return; }
+    state.settings.employeeSheetUrl = url;
+    await saveSettings();
+    syncSaveBtn.disabled = true; syncSaveBtn.textContent = 'Menyinkronkan…';
+    const ok = await syncEmployeesFromSheet(true);
+    renderPengaturan(main);
+    if(ok){ /* success toast already shown */ }
+  };
+  const syncOffBtn = main.querySelector('#s-sync-off');
+  if(syncOffBtn) syncOffBtn.onclick = async () => {
+    state.settings.employeeSheetUrl = '';
+    await saveSettings();
+    showToast('Sinkron real-time dinonaktifkan');
+    renderPengaturan(main);
+  };
+
+  main.querySelectorAll('[data-del-lh]').forEach(b => b.onclick = async () => {
+    if(confirm('Hapus kop surat ini?')){
+      state.letterheads = state.letterheads.filter(l => l.id !== b.dataset.delLh);
+      await saveLetterheads(); showToast('Kop surat dihapus'); renderPengaturan(main);
+    }
+  });
+
+  let pendingImg = null;
+  main.querySelector('#lh-file').onchange = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 900;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        pendingImg = canvas.toDataURL('image/jpeg', 0.85);
+        main.querySelector('#lh-preview').innerHTML = `<img src="${pendingImg}" style="max-width:280px;border:1px solid var(--line);border-radius:6px;">`;
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  main.querySelector('#lh-add-btn').onclick = async () => {
+    const label = main.querySelector('#lh-label').value.trim();
+    const code = main.querySelector('#lh-code').value.trim().toUpperCase();
+    const company = main.querySelector('#lh-company').value.trim();
+    if(!label || !pendingImg){ showToast('Isi label dan pilih gambar kop surat'); return; }
+    state.letterheads.push({ id: uid(), label, companyCode: code, companyName: company, imageDataUrl: pendingImg });
+    await saveLetterheads();
+    showToast('Kop surat ditambahkan');
+    pendingImg = null;
+    renderPengaturan(main);
+  };
+}
+
+/* ============ NAV & INIT ============ */
+document.getElementById('nav').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  state.tab = btn.dataset.tab;
+  render();
+});
+
+loadAll();
+</script>
+</body>
+</html>
