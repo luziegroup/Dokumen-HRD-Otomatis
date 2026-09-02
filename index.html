@@ -146,7 +146,45 @@
 <div id="modal-root"></div>
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="module">
+/* ============ FIREBASE (realtime sync, per-path — hemat kuota) ============ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-analytics.js";
+import {
+  getAuth, signInAnonymously, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import {
+  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot,
+  writeBatch, getDocs
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+// Konfigurasi project Firebase kamu (dari Firebase Console > Project settings)
+const firebaseConfig = {
+  apiKey: "AIzaSyBBLBD_HWDpzpORtjXFPAgggoAbsS9reKM",
+  authDomain: "dokumen-otomatis.firebaseapp.com",
+  projectId: "dokumen-otomatis",
+  storageBucket: "dokumen-otomatis.firebasestorage.app",
+  messagingSenderId: "413731332977",
+  appId: "1:413731332977:web:a52fa13d3ece1e78b6ccd0",
+  measurementId: "G-EF6KRK2L2Q"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+try{ getAnalytics(fbApp); }catch(e){ /* Analytics opsional, aman diabaikan jika gagal */ }
+const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+// Setiap KARYAWAN / DOKUMEN / KOP SURAT adalah satu dokumen Firestore tersendiri
+// (bukan satu blob JSON raksasa untuk semua data). Ini kunci hemat kuota: menambah,
+// mengedit, atau menghapus satu data hanya mengirim data itu saja — bukan menimpa
+// ulang seluruh daftar setiap kali. Lihat acuan "Tulis Per Path, Bukan Seluruh Database".
+const COL = {
+  employees:   collection(db, 'employees'),
+  documents:   collection(db, 'documents'),
+  letterheads: collection(db, 'letterheads')
+};
+const SETTINGS_REF = doc(db, 'settings', 'app');
+
 /* ============ STATE ============ */
 const state = {
   tab: 'dashboard',
@@ -247,14 +285,21 @@ function parseDelimited(text){
   if(field!=='' || row.length){ row.push(field); if(row.some(x=>x.trim()!=='')) rows.push(row); }
   return rows;
 }
-async function fetchAppsScriptCsv(url){
+async function fetchAppsScriptCsv(url, sheetName){
   if(!/^https?:\/\//i.test(url)) throw new Error('Link tidak valid.');
-  const res = await fetch(url);
+  const sep = url.indexOf('?') !== -1 ? '&' : '?';
+  const finalUrl = sheetName ? url + sep + 'sheet=' + encodeURIComponent(sheetName) : url;
+  const res = await fetch(finalUrl);
   if(!res.ok) throw new Error('Gagal mengambil data (status ' + res.status + '). Pastikan deployment diatur "Who has access: Anyone".');
   return await res.text();
 }
-const APPS_SCRIPT_CODE = `function doGet() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+const APPS_SCRIPT_CODE = `function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = (e.parameter && e.parameter.sheet) ? e.parameter.sheet : ss.getSheets()[0].getName();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    return ContentService.createTextOutput('').setMimeType(ContentService.MimeType.CSV);
+  }
   var data = sheet.getDataRange().getValues();
   var csv = data.map(function(row){
     return row.map(function(cell){
@@ -266,6 +311,21 @@ const APPS_SCRIPT_CODE = `function doGet() {
     }).join(',');
   }).join('\\n');
   return ContentService.createTextOutput(csv).setMimeType(ContentService.MimeType.CSV);
+}
+
+function doPost(e) {
+  var payload = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = payload.sheetName || 'Riwayat';
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    if (payload.headers) sheet.appendRow(payload.headers);
+  } else if (sheet.getLastRow() === 0 && payload.headers) {
+    sheet.appendRow(payload.headers);
+  }
+  sheet.appendRow(payload.row);
+  return ContentService.createTextOutput(JSON.stringify({status:'ok'})).setMimeType(ContentService.MimeType.JSON);
 }`;
 function buildEmployeesFromRows(rows){
   if(rows.length < 2) return { employees: [], extraCols: [] };
@@ -318,30 +378,130 @@ function showToast(msg){
   showToast._timer = setTimeout(()=> t.classList.remove('show'), 2200);
 }
 
-/* ============ STORAGE ============ */
-async function loadAll(){
-  try{
-    const [emp, docs, lh, set] = await Promise.all([
-      window.storage.get('employees-list', true).catch(()=>null),
-      window.storage.get('documents-list', true).catch(()=>null),
-      window.storage.get('letterheads-list', true).catch(()=>null),
-      window.storage.get('settings', true).catch(()=>null)
-    ]);
-    state.employees = emp ? JSON.parse(emp.value) : [];
-    state.documents = docs ? JSON.parse(docs.value) : [];
-    state.letterheads = lh ? JSON.parse(lh.value) : [];
-    state.settings = set ? JSON.parse(set.value) : state.settings;
-  }catch(e){ console.error('Gagal memuat data', e); }
-  state.loaded = true;
+/* ============ STORAGE (Firestore realtime, hemat kuota) ============ */
+// Prinsip yang dipakai di bagian ini (mengikuti acuan efisiensi Firebase):
+//  1) Tidak ada listener atau tulis di "root" — tiap koleksi (employees/documents/
+//     letterheads) didengarkan & ditulis terpisah.
+//  2) Tambah/ubah/hapus SATU data hanya mengirim SATU dokumen itu saja, bukan
+//     menimpa ulang seluruh daftar sebagai satu blob JSON raksasa.
+//  3) Tidak ada simpan otomatis tiap ketikan — form baru menulis ke Firestore saat
+//     tombol Simpan ditekan.
+//  4) Semua tulis/hapus dibungkus try/catch dan memberi tahu pengguna lewat toast
+//     kalau gagal (tidak ada kegagalan yang didiamkan).
+const _received = { employees:false, documents:false, letterheads:false, settings:false };
+let _watchersStarted = false;
+let _syncTriggered = false;
+
+function stripId(obj){ const { id, ...rest } = obj; return rest; }
+
+// Dulu layar "Memuat data…" menunggu SEMUA 4 koleksi selesai dimuat baru tampil,
+// jadi kalau salah satu (mis. koleksi "documents" yang sudah banyak isinya) lambat,
+// semuanya ikut tertahan. Sekarang begitu koleksi PERTAMA selesai, Dashboard langsung
+// tampil; sisanya menyusul mengisi tampilan begitu datang (progresif, bukan nunggu semua).
+function _markLoadedAndRender(key){
+  _received[key] = true;
+  if(!state.loaded){ state.loaded = true; }
   render();
-  if(state.settings.employeeSheetUrl){
+  if(key === 'settings' && !_syncTriggered && state.settings.employeeSheetUrl){
+    _syncTriggered = true;
     syncEmployeesFromSheet(false).then(ok => { if(ok) render(); });
   }
 }
-async function saveEmployees(){ try{ await window.storage.set('employees-list', JSON.stringify(state.employees), true);}catch(e){showToast('Gagal menyimpan data karyawan');} }
-async function saveDocuments(){ try{ await window.storage.set('documents-list', JSON.stringify(state.documents), true);}catch(e){showToast('Gagal menyimpan riwayat dokumen');} }
-async function saveLetterheads(){ try{ await window.storage.set('letterheads-list', JSON.stringify(state.letterheads), true);}catch(e){showToast('Gagal menyimpan kop surat');} }
-async function saveSettings(){ try{ await window.storage.set('settings', JSON.stringify(state.settings), true);}catch(e){showToast('Gagal menyimpan pengaturan');} }
+function _onWatchError(key, err){
+  console.error('Realtime error (' + key + '):', err);
+  if(state.loaded) showToast('Koneksi realtime terputus, cek internet/aturan Firestore');
+  _markLoadedAndRender(key);
+}
+function _startWatchers(){
+  if(_watchersStarted) return;
+  _watchersStarted = true;
+  onSnapshot(COL.employees, (snap) => {
+    state.employees = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _markLoadedAndRender('employees');
+  }, (err) => _onWatchError('employees', err));
+
+  onSnapshot(COL.documents, (snap) => {
+    state.documents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _markLoadedAndRender('documents');
+  }, (err) => _onWatchError('documents', err));
+
+  onSnapshot(COL.letterheads, (snap) => {
+    state.letterheads = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _markLoadedAndRender('letterheads');
+  }, (err) => _onWatchError('letterheads', err));
+
+  onSnapshot(SETTINGS_REF, (snap) => {
+    if(snap.exists()) state.settings = { ...state.settings, ...snap.data() };
+    _markLoadedAndRender('settings');
+  }, (err) => _onWatchError('settings', err));
+}
+function loadAll(){
+  // Login anonim dulu (dibutuhkan oleh Firestore Rules "request.auth != null"),
+  // baru setelah itu pasang listener realtime.
+  onAuthStateChanged(auth, (user) => { if(user) _startWatchers(); });
+  signInAnonymously(auth).catch((e) => {
+    console.error('Firebase Auth gagal:', e);
+    showToast('Gagal terhubung ke Firebase (cek koneksi internet)');
+  });
+}
+
+/* --- Tulis per-dokumen: hanya mengirim data yang benar-benar berubah --- */
+async function upsertEmployee(emp){
+  try{ await setDoc(doc(COL.employees, emp.id), stripId(emp)); return true; }
+  catch(e){ console.error(e); showToast('Gagal menyimpan data karyawan'); return false; }
+}
+async function deleteEmployee(id){
+  try{ await deleteDoc(doc(COL.employees, id)); return true; }
+  catch(e){ console.error(e); showToast('Gagal menghapus karyawan'); return false; }
+}
+async function addEmployeesBatch(list){
+  // Dipakai saat impor dari file (aksi besar & disengaja pengguna, bukan pola simpan
+  // rutin), tetap dieksekusi per-dokumen lewat batch — bukan 1 blob JSON gabungan.
+  try{
+    for(let i=0;i<list.length;i+=450){
+      const batch = writeBatch(db);
+      list.slice(i,i+450).forEach(emp => batch.set(doc(COL.employees, emp.id), stripId(emp)));
+      await batch.commit();
+    }
+    return true;
+  }catch(e){ console.error(e); showToast('Gagal mengimpor sebagian data karyawan'); return false; }
+}
+async function replaceAllEmployees(newList){
+  // Dipakai HANYA saat sinkron manual dari spreadsheet — aksi besar & jarang terjadi
+  // (bukan tiap kali ada perubahan kecil), tetap per-dokumen lewat batch.
+  try{
+    const oldSnap = await getDocs(COL.employees);
+    const ops = [];
+    oldSnap.forEach(d => ops.push({ del: d.ref }));
+    newList.forEach(emp => ops.push({ ref: doc(COL.employees, emp.id), data: stripId(emp) }));
+    for(let i=0;i<ops.length;i+=450){
+      const batch = writeBatch(db);
+      ops.slice(i,i+450).forEach(op => op.del ? batch.delete(op.del) : batch.set(op.ref, op.data));
+      await batch.commit();
+    }
+    return true;
+  }catch(e){ console.error(e); showToast('Gagal menyinkronkan data karyawan'); return false; }
+}
+async function upsertDocumentEntry(docItem){
+  try{ await setDoc(doc(COL.documents, docItem.id), stripId(docItem)); return true; }
+  catch(e){ console.error(e); showToast('Gagal menyimpan riwayat dokumen'); return false; }
+}
+async function deleteDocumentEntry(id){
+  try{ await deleteDoc(doc(COL.documents, id)); return true; }
+  catch(e){ console.error(e); showToast('Gagal menghapus dokumen'); return false; }
+}
+async function upsertLetterhead(lh){
+  try{ await setDoc(doc(COL.letterheads, lh.id), stripId(lh)); return true; }
+  catch(e){ console.error(e); showToast('Gagal menyimpan kop surat'); return false; }
+}
+async function deleteLetterhead(id){
+  try{ await deleteDoc(doc(COL.letterheads, id)); return true; }
+  catch(e){ console.error(e); showToast('Gagal menghapus kop surat'); return false; }
+}
+async function saveSettingsPartial(partial){
+  try{ await setDoc(SETTINGS_REF, partial, { merge: true }); return true; }
+  catch(e){ console.error(e); showToast('Gagal menyimpan pengaturan'); return false; }
+}
 
 /* ============ SYNC KARYAWAN DARI SPREADSHEET ============ */
 async function syncEmployeesFromSheet(announce){
@@ -352,15 +512,51 @@ async function syncEmployeesFromSheet(announce){
     const rows = parseDelimited(text);
     const { employees } = buildEmployeesFromRows(rows);
     if(employees.length === 0) throw new Error('Tidak ada baris valid di spreadsheet.');
-    state.employees = employees;
+    const ok = await replaceAllEmployees(employees);
+    if(!ok) return false;
     state.lastSync = Date.now();
-    await saveEmployees();
     if(announce) showToast(`Disinkronkan: ${employees.length} karyawan dari spreadsheet`);
     return true;
   }catch(err){
     if(announce) showToast('Gagal sinkron: ' + err.message);
     return false;
   }
+}
+
+
+async function fetchRiwayatFromSheet(){
+  const url = state.settings.employeeSheetUrl;
+  if(!url) return null;
+  try{
+    const text = await fetchAppsScriptCsv(url, 'Riwayat');
+    const rows = parseDelimited(text);
+    if(rows.length < 2) return [];
+    return rows.slice(1)
+      .filter(r => r.some(c => (c||'').trim() !== ''))
+      .map((r, i) => ({
+        id: 'sheet-' + i,
+        createdAt: Number(r[0]) || Date.now(),
+        employeeName: r[1] || '',
+        templateName: r[2] || '',
+        docNumber: r[3] || '',
+        content: r[4] || '',
+        letterheadImg: ''
+      }));
+  }catch(e){ return null; }
+}
+
+async function pushRiwayatToSheet(doc){
+  const url = state.settings.employeeSheetUrl;
+  if(!url) return false;
+  try{
+    const payload = {
+      sheetName: 'Riwayat',
+      headers: ['Timestamp','Karyawan','Jenis Dokumen','Nomor Surat','Isi Dokumen'],
+      row: [doc.createdAt, doc.employeeName, doc.templateName, doc.docNumber, doc.content]
+    };
+    const res = await fetch(url, { method:'POST', body: JSON.stringify(payload) });
+    return res.ok;
+  }catch(e){ return false; }
 }
 
 /* ============ HELPERS ============ */
@@ -590,8 +786,11 @@ function renderKaryawan(main){
   main.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => { state.genSelectedEmployee = b.dataset.doc; state.tab = 'generator'; render(); });
   main.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
     if(confirm('Hapus karyawan ini? Riwayat dokumen terkait tidak akan terhapus.')){
-      state.employees = state.employees.filter(e => e.id !== b.dataset.del);
-      await saveEmployees(); showToast('Karyawan dihapus'); renderKaryawan(main);
+      const id = b.dataset.del;
+      state.employees = state.employees.filter(e => e.id !== id);
+      renderKaryawan(main);
+      const ok = await deleteEmployee(id);
+      if(ok) showToast('Karyawan dihapus');
     }
   });
 }
@@ -716,11 +915,12 @@ function openImportModal(){
         <button class="btn" id="confirm-import-btn">Import ${employees.length} Karyawan</button>
       </div>`;
     document.getElementById('confirm-import-btn').onclick = async () => {
-      state.employees = state.employees.concat(importParsedRows);
-      await saveEmployees();
-      showToast(`${importParsedRows.length} karyawan berhasil diimpor`);
+      const rowsToImport = importParsedRows;
+      state.employees = state.employees.concat(rowsToImport);
       close();
       render();
+      const ok = await addEmployeesBatch(rowsToImport);
+      if(ok) showToast(`${rowsToImport.length} karyawan berhasil diimpor`);
     };
   }
 
@@ -844,9 +1044,9 @@ function openEmployeeModal(editId){
     };
     if(editing){ state.employees = state.employees.map(e => e.id===editing.id ? data : e); }
     else{ state.employees.push(data); }
-    await saveEmployees();
-    showToast(editing ? 'Perubahan disimpan' : 'Karyawan ditambahkan');
     close(); render();
+    const ok = await upsertEmployee(data);
+    if(ok) showToast(editing ? 'Perubahan disimpan' : 'Karyawan ditambahkan');
   };
 }
 
@@ -958,15 +1158,23 @@ function renderGenerator(main){
 
   const saveBtn = main.querySelector('#btn-save-doc');
   if(saveBtn) saveBtn.onclick = async () => {
-    const doc = {
+    const newDoc = {
       id: uid(), employeeId: emp.id, employeeName: emp.nama,
       templateId: tpl.id, templateName: tpl.name,
       letterheadId: letterhead ? letterhead.id : '', letterheadImg: letterhead ? letterhead.imageDataUrl : '',
       docNumber: state.genDocNumber, content: state.genDraft, createdAt: Date.now()
     };
-    state.documents.push(doc);
-    await saveDocuments();
-    showToast('Dokumen disimpan ke riwayat');
+    state.documents.push(newDoc);
+    const ok = await upsertDocumentEntry(newDoc);
+    if(!ok) return;
+    if(state.settings.employeeSheetUrl){
+      saveBtn.disabled = true; saveBtn.textContent = 'Menyinkronkan…';
+      const pushed = await pushRiwayatToSheet(newDoc);
+      saveBtn.disabled = false; saveBtn.textContent = 'Simpan ke Riwayat';
+      showToast(pushed ? 'Tersimpan & disinkronkan ke spreadsheet' : 'Tersimpan lokal, gagal sinkron ke spreadsheet');
+    } else {
+      showToast('Dokumen disimpan ke riwayat');
+    }
   };
 }
 
@@ -1147,31 +1355,53 @@ async function downloadPdf(title, text, letterhead, filenameBase){
 
 /* ============ RIWAYAT ============ */
 function renderRiwayat(main){
-  const docs = [...state.documents].sort((a,b)=> b.createdAt - a.createdAt);
+  if(state.settings.employeeSheetUrl){
+    main.innerHTML = `<div class="page-head"><h1>Riwayat Dokumen</h1><p>Memuat riwayat dari spreadsheet…</p></div><div class="loading-row">Memuat…</div>`;
+    fetchRiwayatFromSheet().then(sheetDocs => {
+      if(sheetDocs === null){
+        showToast('Gagal memuat dari spreadsheet, menampilkan salinan lokal');
+        renderRiwayatList(main, state.documents, false);
+      } else {
+        renderRiwayatList(main, sheetDocs, true);
+      }
+    });
+  } else {
+    renderRiwayatList(main, state.documents, false);
+  }
+}
+
+function renderRiwayatList(main, docs, fromSheet){
+  const sorted = [...docs].sort((a,b)=> b.createdAt - a.createdAt);
   main.innerHTML = `
-    <div class="page-head"><h1>Riwayat Dokumen</h1><p>Semua dokumen yang telah dibuat dan disimpan oleh tim HRD.</p></div>
-    ${ docs.length === 0
+    <div class="page-head"><h1>Riwayat Dokumen</h1><p>${fromSheet ? '🔄 Disinkronkan real-time dari spreadsheet — semua staff HRD melihat daftar yang sama, di laptop mana pun.' : 'Semua dokumen yang telah dibuat dan disimpan oleh tim HRD.'}</p></div>
+    ${ sorted.length === 0
       ? `<div class="table-wrap"><div class="empty-state"><h3>Belum ada riwayat</h3><p>Dokumen yang Anda simpan dari halaman "Buat Dokumen" akan muncul di sini.</p></div></div>`
-      : docs.map(d => `
+      : sorted.map(d => `
         <div class="history-item">
           <div class="meta"><h4>${esc(d.templateName)} — ${esc(d.employeeName)}</h4><span>${esc(d.docNumber||'')} · Dibuat ${fmtDate(new Date(d.createdAt))}</span></div>
           <div class="row-actions">
             <button class="btn btn-sm btn-outline" data-view="${d.id}">Lihat</button>
-            <button class="btn btn-sm btn-danger" data-del="${d.id}">Hapus</button>
+            ${ fromSheet ? '' : `<button class="btn btn-sm btn-danger" data-del="${d.id}">Hapus</button>` }
           </div>
         </div>`).join('')
     }`;
-  main.querySelectorAll('[data-view]').forEach(b => b.onclick = () => openDocViewModal(b.dataset.view));
+  main.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
+    const doc = docs.find(d => d.id === b.dataset.view);
+    if(doc) openDocViewModal(doc.id, doc);
+  });
   main.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
     if(confirm('Hapus dokumen ini dari riwayat?')){
-      state.documents = state.documents.filter(d => d.id !== b.dataset.del);
-      await saveDocuments(); showToast('Dokumen dihapus'); renderRiwayat(main);
+      const id = b.dataset.del;
+      state.documents = state.documents.filter(d => d.id !== id);
+      renderRiwayat(main);
+      const ok = await deleteDocumentEntry(id);
+      if(ok) showToast('Dokumen dihapus');
     }
   });
 }
 
-function openDocViewModal(docId){
-  const doc = state.documents.find(d => d.id === docId);
+function openDocViewModal(docId, docOverride){
+  const doc = docOverride || state.documents.find(d => d.id === docId);
   if(!doc) return;
   const root = document.getElementById('modal-root');
   root.innerHTML = `
@@ -1212,8 +1442,8 @@ function renderPengaturan(main){
     </div>
 
     <div class="settings-card">
-      <div class="section-title">Sumber Data Karyawan (Real-time)</div>
-      <p class="hint" style="margin-bottom:14px;">Hubungkan ke Spreadsheet yang sama dengan yang dipakai tim HRD lain — setiap kali aplikasi dibuka di laptop siapa pun, data karyawan otomatis disamakan dari sana. Pakai Web App Apps Script yang sama seperti fitur Import (lihat panduan di menu Karyawan → Import dari Spreadsheet).</p>
+      <div class="section-title">Sumber Data Karyawan &amp; Riwayat (Real-time)</div>
+      <p class="hint" style="margin-bottom:14px;">Hubungkan ke Spreadsheet yang sama dengan yang dipakai tim HRD lain. Setelah aktif: data Karyawan otomatis tersinkron, dan setiap dokumen yang disimpan ke Riwayat oleh siapa pun juga otomatis tercatat di tab "Riwayat" pada spreadsheet — sehingga semua staff HRD melihat riwayat yang sama, <strong>bahkan jika file ini di-download dan dibuka langsung di laptop masing-masing</strong> (tidak bergantung pada penyimpanan bawaan Claude). Tab "Riwayat" dibuat otomatis oleh skrip kalau belum ada.</p>
       <div class="form-field" style="margin-bottom:12px;">
         <label>Link Web App Apps Script</label>
         <input id="s-sheeturl" value="${esc(s.employeeSheetUrl)}" placeholder="https://script.google.com/macros/s/....../exec">
@@ -1257,15 +1487,15 @@ function renderPengaturan(main){
     </div>`;
 
   main.querySelector('#s-save').onclick = async () => {
-    state.settings = {
-      ...state.settings,
+    const partial = {
       hrName: main.querySelector('#s-hrname').value.trim(),
       hrTitle: main.querySelector('#s-hrtitle').value.trim() || 'Supervisor HRD',
       hrAddress: main.querySelector('#s-hraddr').value.trim(),
       citySigning: main.querySelector('#s-city').value.trim() || 'Purwokerto'
     };
-    await saveSettings();
-    showToast('Pengaturan disimpan');
+    state.settings = { ...state.settings, ...partial };
+    const ok = await saveSettingsPartial(partial);
+    if(ok) showToast('Pengaturan disimpan');
   };
 
   const syncSaveBtn = main.querySelector('#s-sync-save');
@@ -1273,7 +1503,8 @@ function renderPengaturan(main){
     const url = main.querySelector('#s-sheeturl').value.trim();
     if(!url){ showToast('Tempel link Web App terlebih dahulu'); return; }
     state.settings.employeeSheetUrl = url;
-    await saveSettings();
+    const saved = await saveSettingsPartial({ employeeSheetUrl: url });
+    if(!saved) return;
     syncSaveBtn.disabled = true; syncSaveBtn.textContent = 'Menyinkronkan…';
     const ok = await syncEmployeesFromSheet(true);
     renderPengaturan(main);
@@ -1282,15 +1513,18 @@ function renderPengaturan(main){
   const syncOffBtn = main.querySelector('#s-sync-off');
   if(syncOffBtn) syncOffBtn.onclick = async () => {
     state.settings.employeeSheetUrl = '';
-    await saveSettings();
+    await saveSettingsPartial({ employeeSheetUrl: '' });
     showToast('Sinkron real-time dinonaktifkan');
     renderPengaturan(main);
   };
 
   main.querySelectorAll('[data-del-lh]').forEach(b => b.onclick = async () => {
     if(confirm('Hapus kop surat ini?')){
-      state.letterheads = state.letterheads.filter(l => l.id !== b.dataset.delLh);
-      await saveLetterheads(); showToast('Kop surat dihapus'); renderPengaturan(main);
+      const id = b.dataset.delLh;
+      state.letterheads = state.letterheads.filter(l => l.id !== id);
+      renderPengaturan(main);
+      const ok = await deleteLetterhead(id);
+      if(ok) showToast('Kop surat dihapus');
     }
   });
 
@@ -1324,9 +1558,10 @@ function renderPengaturan(main){
     const code = main.querySelector('#lh-code').value.trim().toUpperCase();
     const company = main.querySelector('#lh-company').value.trim();
     if(!label || !pendingImg){ showToast('Isi label dan pilih gambar kop surat'); return; }
-    state.letterheads.push({ id: uid(), label, companyCode: code, companyName: company, imageDataUrl: pendingImg });
-    await saveLetterheads();
-    showToast('Kop surat ditambahkan');
+    const newLetterhead = { id: uid(), label, companyCode: code, companyName: company, imageDataUrl: pendingImg };
+    state.letterheads.push(newLetterhead);
+    const ok = await upsertLetterhead(newLetterhead);
+    if(ok) showToast('Kop surat ditambahkan');
     pendingImg = null;
     renderPengaturan(main);
   };
