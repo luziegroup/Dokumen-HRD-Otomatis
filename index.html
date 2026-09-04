@@ -580,12 +580,23 @@ async function pushRiwayatToSheet(docItem, letterhead){
       pdfBase64,
       fileName: safeName + '.pdf'
     };
-    // mode:'no-cors' dipakai karena aplikasi ini sering dibuka lewat file:// (origin "null"),
-    // dan balasan dari script.google.com tidak selalu membawa header CORS untuk origin itu.
-    // Browser tetap MENGIRIM permintaannya (jadi Apps Script tetap menulis ke sheet), hanya saja
-    // kita tidak diizinkan MEMBACA balasannya (jadi res.ok/res.status selalu tidak bisa dipercaya
-    // dalam mode ini). Karena itu kita anggap berhasil selama tidak ada error jaringan.
-    await fetch(url, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) });
+    // Dulu pakai mode:'no-cors' untuk jaga-jaga kalau aplikasi dibuka lewat file://.
+    // Sekarang aplikasi dihost di https (Vercel dkk), jadi mode:'cors' biasa dipakai —
+    // ini PENTING karena no-cors membuat kita tidak bisa membaca status respons sama
+    // sekali (selalu dianggap sukses walau Apps Script sebenarnya gagal/butuh otorisasi),
+    // dan pada beberapa kasus redirect POST di no-cors bisa membuat body/payload hilang.
+    const res = await fetch(url, { method:'POST', body: JSON.stringify(payload) });
+    const text = await res.text();
+    if(!res.ok){
+      console.error('Backup ke spreadsheet gagal, HTTP status', res.status, text);
+      return false;
+    }
+    let json = null;
+    try{ json = JSON.parse(text); }catch(e){ /* bukan JSON valid */ }
+    if(!json || json.status !== 'ok'){
+      console.error('Backup ke spreadsheet gagal, respons tidak sesuai:', text);
+      return false;
+    }
     return true;
   }catch(e){ console.error('Gagal mengirim backup ke spreadsheet:', e); return false; }
 }
