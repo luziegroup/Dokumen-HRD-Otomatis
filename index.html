@@ -318,14 +318,34 @@ function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = payload.sheetName || 'Riwayat';
   var sheet = ss.getSheetByName(sheetName);
+  var headers = payload.headers || ['Timestamp','Karyawan','Jenis Dokumen','Nomor Surat','Link PDF'];
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
-    if (payload.headers) sheet.appendRow(payload.headers);
-  } else if (sheet.getLastRow() === 0 && payload.headers) {
-    sheet.appendRow(payload.headers);
+    sheet.appendRow(headers);
+  } else if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
   }
-  sheet.appendRow(payload.row);
+
+  var row;
+  if (payload.pdfBase64) {
+    var folder = getOrCreateFolder_('Riwayat Dokumen HRD');
+    var bytes = Utilities.base64Decode(payload.pdfBase64);
+    var blob = Utilities.newBlob(bytes, 'application/pdf', payload.fileName || 'dokumen.pdf');
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    row = (payload.meta || []).concat([file.getUrl()]);
+  } else {
+    row = payload.row || [];
+  }
+
+  sheet.appendRow(row);
   return ContentService.createTextOutput(JSON.stringify({status:'ok'})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getOrCreateFolder_(name) {
+  var folders = DriveApp.getFoldersByName(name);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(name);
 }`;
 function buildEmployeesFromRows(rows){
   if(rows.length < 2) return { employees: [], extraCols: [] };
@@ -545,18 +565,29 @@ async function fetchRiwayatFromSheet(){
   }catch(e){ return null; }
 }
 
-async function pushRiwayatToSheet(doc){
+async function pushRiwayatToSheet(docItem, letterhead){
   const url = state.settings.employeeSheetUrl;
   if(!url) return false;
   try{
+    const pdfBase64 = await buildPdfBase64(docItem.templateName, docItem.content, letterhead);
+    const safeName = `${docItem.templateName} - ${docItem.employeeName}`.replace(/[\\/:*?"<>|]/g, '-');
     const payload = {
       sheetName: 'Riwayat',
-      headers: ['Timestamp','Karyawan','Jenis Dokumen','Nomor Surat','Isi Dokumen'],
-      row: [doc.createdAt, doc.employeeName, doc.templateName, doc.docNumber, doc.content]
+      headers: ['Timestamp','Karyawan','Jenis Dokumen','Nomor Surat','Link PDF'],
+      // "meta" = kolom yang sudah jadi teks biasa; kolom Link PDF diisi Apps Script sendiri
+      // setelah dia berhasil upload file-nya ke Drive (lihat kode Apps Script terbaru).
+      meta: [docItem.createdAt, docItem.employeeName, docItem.templateName, docItem.docNumber],
+      pdfBase64,
+      fileName: safeName + '.pdf'
     };
-    const res = await fetch(url, { method:'POST', body: JSON.stringify(payload) });
-    return res.ok;
-  }catch(e){ return false; }
+    // mode:'no-cors' dipakai karena aplikasi ini sering dibuka lewat file:// (origin "null"),
+    // dan balasan dari script.google.com tidak selalu membawa header CORS untuk origin itu.
+    // Browser tetap MENGIRIM permintaannya (jadi Apps Script tetap menulis ke sheet), hanya saja
+    // kita tidak diizinkan MEMBACA balasannya (jadi res.ok/res.status selalu tidak bisa dipercaya
+    // dalam mode ini). Karena itu kita anggap berhasil selama tidak ada error jaringan.
+    await fetch(url, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) });
+    return true;
+  }catch(e){ console.error('Gagal mengirim backup ke spreadsheet:', e); return false; }
 }
 
 /* ============ HELPERS ============ */
@@ -1169,9 +1200,9 @@ function renderGenerator(main){
     if(!ok) return;
     if(state.settings.employeeSheetUrl){
       saveBtn.disabled = true; saveBtn.textContent = 'Menyinkronkan…';
-      const pushed = await pushRiwayatToSheet(newDoc);
+      const pushed = await pushRiwayatToSheet(newDoc, letterhead);
       saveBtn.disabled = false; saveBtn.textContent = 'Simpan ke Riwayat';
-      showToast(pushed ? 'Tersimpan & disinkronkan ke spreadsheet' : 'Tersimpan lokal, gagal sinkron ke spreadsheet');
+      showToast(pushed ? 'Tersimpan & backup terkirim ke spreadsheet' : 'Tersimpan lokal, gagal kirim backup (cek koneksi)');
     } else {
       showToast('Dokumen disimpan ke riwayat');
     }
@@ -1276,75 +1307,79 @@ function wordWrapPdf(text, width){
   return lines;
 }
 
+async function buildPdfDoc(title, text, letterhead){
+  const JsPDFCtor = await ensureJsPDF();
+  const doc = new JsPDFCtor({ unit:'mm', format:'a4' });
+  doc.setFont('courier','normal');
+  const fontSize = 9;
+  doc.setFontSize(fontSize);
+  doc.setTextColor(20,20,20);
+
+  const marginLeft = 18, marginTop = 18, marginRight = 18, marginBottom = 16;
+  const pageHeight = 297, pageWidth = 210;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+  const charWidth = doc.getTextWidth('0') || 1.6;
+  const maxChars = Math.max(20, Math.floor(contentWidth / charWidth));
+  const lineHeight = fontSize * 0.3528 * 1.55;
+
+  let img = null, headerHeight = 0;
+  if(letterhead){
+    try{
+      img = await loadImageEl(letterhead.imageDataUrl);
+      headerHeight = contentWidth * (img.naturalHeight / img.naturalWidth);
+    }catch(e){ img = null; }
+  }
+  const startY = marginTop + (img ? headerHeight + 4 : 0);
+  function drawHeader(){
+    if(img){
+      const fmt = letterhead.imageDataUrl.indexOf('image/png') !== -1 ? 'PNG' : 'JPEG';
+      doc.addImage(letterhead.imageDataUrl, fmt, marginLeft, marginTop, contentWidth, headerHeight);
+    }
+  }
+
+  let y = startY;
+  drawHeader();
+
+  function newPageIfNeeded(){
+    if(y + lineHeight > pageHeight - marginBottom){
+      doc.addPage();
+      drawHeader();
+      y = startY;
+    }
+  }
+
+  const rawLines = text.split(/\r?\n/);
+  for(const rawLine of rawLines){
+    if(rawLine.trim() === ''){ y += lineHeight; newPageIfNeeded(); continue; }
+
+    let outputs;
+    if(rawLine.length <= maxChars){
+      outputs = [{ x:0, str: rawLine }];
+    } else {
+      let indentChars = 0;
+      const listMatch = rawLine.match(/^(\s*)([A-Za-z0-9]{1,2}\.\s+)/);
+      if(listMatch){ indentChars = listMatch[1].length + listMatch[2].length; }
+      else { const idx = rawLine.indexOf(' : '); if(idx !== -1) indentChars = idx + 3; }
+      const prefixText = rawLine.slice(0, indentChars);
+      const valueText = rawLine.slice(indentChars);
+      const chunkWidth = Math.max(10, maxChars - indentChars);
+      const chunks = wordWrapPdf(valueText, chunkWidth);
+      outputs = chunks.map((c,i) => i===0 ? { x:0, str: prefixText + c } : { x:indentChars, str: c });
+    }
+
+    for(const o of outputs){
+      newPageIfNeeded();
+      doc.text(o.str, marginLeft + o.x * charWidth, y);
+      y += lineHeight;
+    }
+  }
+  return doc;
+}
+
 async function downloadPdf(title, text, letterhead, filenameBase){
   showToast('Menyiapkan PDF…');
   try{
-    const JsPDFCtor = await ensureJsPDF();
-    const doc = new JsPDFCtor({ unit:'mm', format:'a4' });
-    doc.setFont('courier','normal');
-    const fontSize = 9;
-    doc.setFontSize(fontSize);
-    doc.setTextColor(20,20,20);
-
-    const marginLeft = 18, marginTop = 18, marginRight = 18, marginBottom = 16;
-    const pageHeight = 297, pageWidth = 210;
-    const contentWidth = pageWidth - marginLeft - marginRight;
-    const charWidth = doc.getTextWidth('0') || 1.6;
-    const maxChars = Math.max(20, Math.floor(contentWidth / charWidth));
-    const lineHeight = fontSize * 0.3528 * 1.55;
-
-    let img = null, headerHeight = 0;
-    if(letterhead){
-      try{
-        img = await loadImageEl(letterhead.imageDataUrl);
-        headerHeight = contentWidth * (img.naturalHeight / img.naturalWidth);
-      }catch(e){ img = null; }
-    }
-    const startY = marginTop + (img ? headerHeight + 4 : 0);
-    function drawHeader(){
-      if(img){
-        const fmt = letterhead.imageDataUrl.indexOf('image/png') !== -1 ? 'PNG' : 'JPEG';
-        doc.addImage(letterhead.imageDataUrl, fmt, marginLeft, marginTop, contentWidth, headerHeight);
-      }
-    }
-
-    let y = startY;
-    drawHeader();
-
-    function newPageIfNeeded(){
-      if(y + lineHeight > pageHeight - marginBottom){
-        doc.addPage();
-        drawHeader();
-        y = startY;
-      }
-    }
-
-    const rawLines = text.split(/\r?\n/);
-    for(const rawLine of rawLines){
-      if(rawLine.trim() === ''){ y += lineHeight; newPageIfNeeded(); continue; }
-
-      let outputs;
-      if(rawLine.length <= maxChars){
-        outputs = [{ x:0, str: rawLine }];
-      } else {
-        let indentChars = 0;
-        const listMatch = rawLine.match(/^(\s*)([A-Za-z0-9]{1,2}\.\s+)/);
-        if(listMatch){ indentChars = listMatch[1].length + listMatch[2].length; }
-        else { const idx = rawLine.indexOf(' : '); if(idx !== -1) indentChars = idx + 3; }
-        const prefixText = rawLine.slice(0, indentChars);
-        const valueText = rawLine.slice(indentChars);
-        const chunkWidth = Math.max(10, maxChars - indentChars);
-        const chunks = wordWrapPdf(valueText, chunkWidth);
-        outputs = chunks.map((c,i) => i===0 ? { x:0, str: prefixText + c } : { x:indentChars, str: c });
-      }
-
-      for(const o of outputs){
-        newPageIfNeeded();
-        doc.text(o.str, marginLeft + o.x * charWidth, y);
-        y += lineHeight;
-      }
-    }
-
+    const doc = await buildPdfDoc(title, text, letterhead);
     doc.save(`${filenameBase}.pdf`);
     showToast('PDF berhasil diunduh');
   }catch(err){
@@ -1353,27 +1388,25 @@ async function downloadPdf(title, text, letterhead, filenameBase){
   }
 }
 
+async function buildPdfBase64(title, text, letterhead){
+  const doc = await buildPdfDoc(title, text, letterhead);
+  const dataUri = doc.output('datauristring');
+  return dataUri.slice(dataUri.indexOf(',') + 1); // buang prefix "data:application/pdf;...base64,"
+}
+
 /* ============ RIWAYAT ============ */
 function renderRiwayat(main){
-  if(state.settings.employeeSheetUrl){
-    main.innerHTML = `<div class="page-head"><h1>Riwayat Dokumen</h1><p>Memuat riwayat dari spreadsheet…</p></div><div class="loading-row">Memuat…</div>`;
-    fetchRiwayatFromSheet().then(sheetDocs => {
-      if(sheetDocs === null){
-        showToast('Gagal memuat dari spreadsheet, menampilkan salinan lokal');
-        renderRiwayatList(main, state.documents, false);
-      } else {
-        renderRiwayatList(main, sheetDocs, true);
-      }
-    });
-  } else {
-    renderRiwayatList(main, state.documents, false);
-  }
+  // Riwayat dokumen sudah realtime lewat Firestore (koleksi "documents") — semua staff
+  // yang membuka aplikasi ini otomatis melihat daftar yang sama, di laptop mana pun,
+  // tanpa perlu ambil ulang dari spreadsheet. Spreadsheet cuma dipakai sebagai BACKUP
+  // (lihat pushRiwayatToSheet), bukan sumber tampilan.
+  renderRiwayatList(main, state.documents, false);
 }
 
 function renderRiwayatList(main, docs, fromSheet){
   const sorted = [...docs].sort((a,b)=> b.createdAt - a.createdAt);
   main.innerHTML = `
-    <div class="page-head"><h1>Riwayat Dokumen</h1><p>${fromSheet ? '🔄 Disinkronkan real-time dari spreadsheet — semua staff HRD melihat daftar yang sama, di laptop mana pun.' : 'Semua dokumen yang telah dibuat dan disimpan oleh tim HRD.'}</p></div>
+    <div class="page-head"><h1>Riwayat Dokumen</h1><p>${fromSheet ? '🔄 Disinkronkan real-time dari spreadsheet — semua staff HRD melihat daftar yang sama, di laptop mana pun.' : '🔄 Realtime — semua staff HRD yang membuka aplikasi ini melihat daftar yang sama persis, di perangkat mana pun.'}</p></div>
     ${ sorted.length === 0
       ? `<div class="table-wrap"><div class="empty-state"><h3>Belum ada riwayat</h3><p>Dokumen yang Anda simpan dari halaman "Buat Dokumen" akan muncul di sini.</p></div></div>`
       : sorted.map(d => `
